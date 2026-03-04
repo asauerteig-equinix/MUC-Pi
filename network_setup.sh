@@ -27,30 +27,44 @@ log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
+append_once() {
+    local line="$1"
+    local file="$2"
+    grep -Fxq "$line" "$file" 2>/dev/null || echo "$line" >> "$file"
+}
+
 # Check root
 if [ "$EUID" -ne 0 ]; then
     log_error "Dieses Skript benötigt sudo!"
     exit 1
 fi
 
-# Schritt 1: Systemd-resolved konfigurieren
-log_info "Konfiguriere DNS (systemd-resolved)..."
-mkdir -p /etc/systemd/resolved.conf.d
-cat > /etc/systemd/resolved.conf.d/muc.conf << 'EOF'
+# Schritt 1: DNS konfigurieren (systemd-resolved falls vorhanden)
+if systemctl list-unit-files | grep -q '^systemd-resolved\.service'; then
+    log_info "Konfiguriere DNS (systemd-resolved)..."
+    mkdir -p /etc/systemd/resolved.conf.d
+    cat > /etc/systemd/resolved.conf.d/muc.conf << 'EOF'
 [Resolve]
 DNS=8.8.8.8 8.8.4.4
 FallbackDNS=1.1.1.1 1.0.0.1
-DNS=127.0.0.1
 DNSSEC=no
 EOF
-systemctl restart systemd-resolved
-log_info "DNS konfiguriert"
+    systemctl restart systemd-resolved
+    log_info "DNS über systemd-resolved konfiguriert"
+else
+    log_warn "systemd-resolved nicht gefunden - überspringe diesen Schritt"
+    log_info "Setze Fallback-DNS in /etc/resolv.conf"
+    cat > /etc/resolv.conf << 'EOF'
+nameserver 8.8.8.8
+nameserver 1.1.1.1
+EOF
+fi
 
 # Schritt 2: Hostname setzen
 log_info "Setze Hostname auf 'muc'..."
 hostnamectl set-hostname muc
 sed -i 's/127.0.1.1.*/127.0.1.1       muc/g' /etc/hosts
-echo "127.0.1.1       muc" >> /etc/hosts
+append_once "127.0.1.1       muc" /etc/hosts
 log_info "Hostname gesetzt: $(hostname)"
 
 # Schritt 3: Netzwerk-Interfaces prüfen
@@ -90,6 +104,12 @@ echo ""
 
 # Schritt 4: dhcpcd konfigurieren (für Static IP auf Ethernet)
 log_info "Konfiguriere dhcpcd für statische Ethernet-IP..."
+if [ ! -f /etc/dhcpcd.conf ]; then
+    log_warn "/etc/dhcpcd.conf nicht gefunden - installiere dhcpcd5"
+    apt-get install -y dhcpcd5
+fi
+
+if ! grep -q "# Smartmeter Bridge" /etc/dhcpcd.conf; then
 cat >> /etc/dhcpcd.conf << EOF
 
 # Smartmeter Bridge
@@ -101,6 +121,9 @@ static domain_name_servers=8.8.8.8 8.8.4.4
 # WiFi - DHCP
 interface $WIFI_IF
 EOF
+else
+    log_warn "Smartmeter-Bridge Eintrag existiert bereits in /etc/dhcpcd.conf"
+fi
 log_info "dhcpcd konfiguriert"
 
 # Schritt 5: iptables-persistent installieren
@@ -109,7 +132,7 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y iptables-persistent
 
 # Schritt 6: IP Forwarding aktivieren
 log_info "Aktiviere IP Forwarding..."
-echo "net.ipv4.ip_forward=1" | tee -a /etc/sysctl.conf
+append_once "net.ipv4.ip_forward=1" /etc/sysctl.conf
 sysctl -p >/dev/null
 
 # Schritt 7: iptables Rules
@@ -140,7 +163,7 @@ log_info "iptables Regeln gespeichert"
 
 # Schritt 8: Broadcasting auf Ethernet aktivieren
 log_info "Aktiviere Broadcasting..."
-echo "net.ipv4.icmp_echo_ignore_broadcasts=0" | tee -a /etc/sysctl.conf
+append_once "net.ipv4.icmp_echo_ignore_broadcasts=0" /etc/sysctl.conf
 sysctl -p >/dev/null
 
 echo ""
