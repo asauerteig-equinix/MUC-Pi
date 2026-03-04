@@ -16,10 +16,10 @@
    ✓ init_db.py          - Datenbank-Setup
 
 2️⃣ WEB-INTERFACE (Bootstrap 5 + Responsive)
-   ✓ template/base.html     - Navigation & Layout
-   ✓ template/index.html    - Dashboard mit Plotly
-   ✓ template/sensors.html  - Sensor-Verwaltung
-   ✓ template/error.html    - Error Pages
+   ✓ templates/base.html     - Navigation & Layout
+   ✓ templates/index.html    - Dashboard mit Plotly
+   ✓ templates/sensors.html  - Sensor-Verwaltung
+   ✓ templates/error.html    - Error Pages
    ✓ static/css/style.css   - Custom Styles
    ✓ static/js/theme.js     - Dark/Light Mode
 
@@ -129,7 +129,7 @@ smartmeter_project/
 ├── static/
 │   ├── css/style.css          ← Bootstrap + Custom
 │   └── js/theme.js            ← Dark/Light Mode
-├── template/
+├── templates/
 │   ├── base.html              ← Base Template
 │   ├── index.html             ← Dashboard
 │   ├── sensors.html           ← Sensor-Mgmt
@@ -255,7 +255,7 @@ $ sudo systemctl restart smartmeter
 2. cronjob_fetch.py
    • Zeitplan anpassen
 
-3. template/base.html
+3. templates/base.html
    • NAvigation/Branding ändern
 
 4. static/css/style.css

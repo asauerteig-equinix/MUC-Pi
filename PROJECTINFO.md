@@ -34,10 +34,10 @@ init_db.py             - Datenbank-Initialisierungsskript
 ### Web-Interface
 
 ```
-template/base.html     - Base Template mit Navigation
-template/index.html    - Dashboard mit Plotly-Diagrammen
-template/sensors.html  - Sensor-Verwaltungsseite
-template/error.html    - Error Page
+templates/base.html     - Base Template mit Navigation
+templates/index.html    - Dashboard mit Plotly-Diagrammen
+templates/sensors.html  - Sensor-Verwaltungsseite
+templates/error.html    - Error Page
 
 static/css/style.css   - Bootstrap + Custom Styles
 static/js/theme.js     - Dark/Light Mode Toggle

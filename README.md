@@ -182,7 +182,7 @@ smartmeter_project/
 ├── static/
 │   ├── css/style.css        # Bootstrap + Custom Styles
 │   └── js/theme.js          # Dark/Light Mode
-├── template/
+├── templates/
 │   ├── base.html            # Base Template
 │   ├── index.html           # Dashboard
 │   ├── sensors.html         # Sensor-Verwaltung

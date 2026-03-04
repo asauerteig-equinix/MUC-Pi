@@ -57,8 +57,8 @@ apt-get install -y \
     wget \
     nginx \
     iptables-persistent \
-    hostapd \
-    dnsmasq
+    network-manager \
+    dhcpcd5
 
 # 4. Projektverzeichnis
 PROJECT_DIR="/home/pi/smartmeter_project"
@@ -162,10 +162,14 @@ log_info ""
 log_info "Netzwerk-Bridge Konfiguration"
 log_info "================================"
 echo ""
+echo "Dieses Skript unterstützt automatisch:"
+echo "  • NetworkManager (moderne Raspberry Pi OS Bookworm)"
+echo "  • dhcpcd (ältere Varianten)"
+echo ""
 read -p "Soll die Netzwerk-Bridge (WiFi ↔ LAN zum MUC) konfiguriert werden? (j/n): " -n 1 -r
 echo ""
 if [[ $REPLY =~ ^[Jj]$ ]]; then
-    log_info "Starte Netzwerk-Bridge Setup..."
+    log_info "Starte Netzwerk-Bridge Setup (Auto-Detection aktiv)..."
     chmod +x "$PROJECT_DIR/network_setup.sh"
     bash "$PROJECT_DIR/network_setup.sh"
     

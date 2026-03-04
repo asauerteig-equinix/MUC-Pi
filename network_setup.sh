@@ -102,15 +102,62 @@ fi
 
 echo ""
 
-# Schritt 4: dhcpcd konfigurieren (für Static IP auf Ethernet)
-log_info "Konfiguriere dhcpcd für statische Ethernet-IP..."
-if [ ! -f /etc/dhcpcd.conf ]; then
-    log_warn "/etc/dhcpcd.conf nicht gefunden - installiere dhcpcd5"
-    apt-get install -y dhcpcd5
+# Schritt 4: Erkenne aktiven Netzwerk-Service
+log_info "Erkenne aktiven Netzwerk-Service..."
+
+NETWORK_SERVICE=""
+if systemctl is-active --quiet NetworkManager; then
+    NETWORK_SERVICE="NetworkManager"
+    log_info "NetworkManager ist aktiv - verwende nmcli für eth0 Konfiguration"
+elif systemctl is-active --quiet dhcpcd; then
+    NETWORK_SERVICE="dhcpcd"
+    log_info "dhcpcd ist aktiv - verwende dhcpcd.conf für eth0 Konfiguration"
+else
+    log_warn "Weder NetworkManager noch dhcpcd aktiv - versuche dhcpcd"
+    NETWORK_SERVICE="dhcpcd"
 fi
 
-if ! grep -q "# Smartmeter Bridge" /etc/dhcpcd.conf; then
-cat >> /etc/dhcpcd.conf << EOF
+echo ""
+
+if [ "$NETWORK_SERVICE" = "NetworkManager" ]; then
+    # ========== NETWORMANAGER KONFIGURATION ==========
+    log_info "Konfiguriere eth0 über NetworkManager (nmcli)..."
+    
+    # Stelle sicher, dass NetworkManager läuft
+    systemctl enable NetworkManager
+    systemctl restart NetworkManager
+    sleep 2
+    
+    # Eth0 vom DHCP zu statischer IP
+    # Lösche alte Verbindung falls vorhanden
+    nmcli connection delete "$ETH_IF" 2>/dev/null || true
+    
+    # Erstelle neue statische Verbindung für eth0
+    nmcli connection add \
+        type ethernet \
+        ifname "$ETH_IF" \
+        con-name "$ETH_IF" \
+        ip4 192.168.100.1/24 \
+        gw4 192.168.100.254 \
+        ipv4.dns "8.8.8.8 8.8.4.4" \
+        ipv4.method manual
+    
+    # Aktiviere die Verbindung
+    nmcli connection up "$ETH_IF"
+    
+    log_info "eth0 via NetworkManager konfiguriert: 192.168.100.1/24"
+    
+else
+    # ========== DHCPCD KONFIGURATION ==========
+    log_info "Konfiguriere eth0 über dhcpcd..."
+    
+    if [ ! -f /etc/dhcpcd.conf ]; then
+        log_warn "/etc/dhcpcd.conf nicht gefunden - installiere dhcpcd5"
+        apt-get install -y dhcpcd5
+    fi
+    
+    if ! grep -q "# Smartmeter Bridge" /etc/dhcpcd.conf; then
+    cat >> /etc/dhcpcd.conf << EOF
 
 # Smartmeter Bridge
 interface $ETH_IF
@@ -121,10 +168,18 @@ static domain_name_servers=8.8.8.8 8.8.4.4
 # WiFi - DHCP
 interface $WIFI_IF
 EOF
-else
-    log_warn "Smartmeter-Bridge Eintrag existiert bereits in /etc/dhcpcd.conf"
+    else
+        log_warn "Smartmeter-Bridge Eintrag existiert bereits in /etc/dhcpcd.conf"
+    fi
+    
+    # Starten/Neustarten von dhcpcd
+    systemctl enable dhcpcd
+    systemctl restart dhcpcd
+    
+    log_info "eth0 via dhcpcd konfiguriert: 192.168.100.1/24"
 fi
-log_info "dhcpcd konfiguriert"
+
+echo ""
 
 # Schritt 5: iptables-persistent installieren
 log_info "Installiere iptables-persistent..."
@@ -175,6 +230,7 @@ echo "Konfiguration:"
 echo "  WiFi Interface:     $WIFI_IF (DHCP vom Router)"
 echo "  Ethernet Interface: $ETH_IF (Statisch 192.168.100.1/24)"
 echo "  Hostname:           muc"
+echo "  Netzwerk-Service:   $NETWORK_SERVICE"
 echo "  IP Forwarding:      Aktiviert"
 echo "  Port Forwarding:    8080 → MUC:502"
 echo ""
