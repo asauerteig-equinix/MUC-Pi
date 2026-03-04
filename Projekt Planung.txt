@@ -1,0 +1,211 @@
+1. Vorbereitung
+1.1. Anforderungsanalyse und Setup
+
+    Ziel: Alles Notwendige installieren und einrichten, um später Python-Skripte zu entwickeln.
+
+    Aufgaben:
+
+        Raspberry Pi OS (Bookworm Lite) aktuell halten.
+
+        Internetzugang über WLAN sowie funktionierende Verbindung zum Smartmeter (über die bereits eingerichtete Bridge).
+
+        Installation der notwendigen Softwarepakete:
+
+            Python (3.x sollte standardmäßig installiert sein)
+
+            FTP-Client-Bibliothek (zum Beispiel das Standardmodul ftplib)
+
+            Bibliotheken zur XML-Verarbeitung (xml.etree.ElementTree oder lxml)
+
+            Datenbank-Support (z. B. SQLite, MySQL oder PostgreSQL; für einen schnellen Start empfiehlt sich SQLite)
+
+            Web-Framework (z. B. Flask)
+
+    Beispielbefehle:
+
+    sudo apt update
+    sudo apt install python3 python3-pip sqlite3
+    sudo pip3 install flask
+
+    Optional: Erstelle ein eigenes Verzeichnis für das Projekt (z. B. /home/pi/smartmeter_project).
+
+2. FTP-Abruf der Logdatei
+2.1. Entwicklung eines Python-Skripts zur FTP-Verbindung
+
+    Ziel: Mit einem Python-Skript regelmäßig die XML-Logdatei vom Smartmeter abrufen.
+
+    Aufgaben:
+
+        Verwende das Python-Modul ftplib, um eine FTP-Verbindung zum Smartmeter herzustellen.
+
+        Authentifiziere dich (falls notwendig) und lade die XML-Logdatei herunter.
+
+        Speichere die Datei temporär oder direkt in ein definiertes Verzeichnis.
+
+    Teilaufgabe: Erstelle ein erstes Testskript, das einmalig die Verbindung herstellt und die XML-Datei abruft.
+
+2.2. Testen des FTP-Skripts
+
+    Ziel: Sicherstellen, dass die Datei korrekt abgerufen wird.
+
+    Aufgaben:
+
+        Führe das Skript auf dem Raspberry Pi aus und kontrolliere, ob die XML-Datei im erwarteten Verzeichnis abgelegt wurde.
+
+        Logge eventuelle Verbindungs- oder Abruffehler.
+
+3. XML-Parsen und Datenbankintegration
+3.1. Erstellen eines Datenbankschemas
+
+    Ziel: Eine Datenbank (z. B. SQLite) anlegen, in der die relevanten Daten des Smartmeters gespeichert werden.
+
+    Aufgaben:
+
+        Definiere, welche Daten aus der XML-Logdatei extrahiert werden sollen (z. B. Zeitstempel, Messwerte, Statusinformationen etc.).
+
+        Erstelle eine Datenbank und einen oder mehrere Tabellen, die diese Informationen speichern.
+
+        Beispiel: Eine Tabelle logs mit Spalten wie id, timestamp, value, status usw.
+
+    Beispielcode:
+
+    import sqlite3
+
+    conn = sqlite3.connect('smartmeter.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS logs 
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                  timestamp TEXT, 
+                  value REAL,
+                  status TEXT)''')
+    conn.commit()
+    conn.close()
+
+3.2. XML-Daten parsen
+
+    Ziel: Das Abruf-Skript so erweitern, dass es die heruntergeladene XML-Datei parst.
+
+    Aufgaben:
+
+        Verwende xml.etree.ElementTree oder lxml, um relevante Werte aus der XML-Datei auszulesen.
+
+        Validieren, ob alle Daten wie erwartet erkannt werden.
+
+    Teilaufgabe: Erstelle ein separates Testskript, das die XML-Datei liest und die Daten in der Konsole ausgibt.
+
+3.3. Daten in die Datenbank schreiben
+
+    Ziel: Geparste Daten in die zuvor erstellte Datenbank einfügen.
+
+    Aufgaben:
+
+        Integriere in das FTP-Skript den Schritt, die XML-Daten zu parsen.
+
+        Schreibe die extrahierten Werte in die Datenbank.
+
+        Implementiere Fehlerbehandlung (z. B. doppelte Einträge vermeiden oder veraltete Daten updaten).
+
+4. Periodischer Abruf der XML-Logdatei
+4.1. Einrichtung eines Zeitplans
+
+    Ziel: Das Python-Skript soll automatisch in regelmäßigen Intervallen (z. B. alle 5 oder 10 Minuten) laufen.
+
+    Aufgaben:
+
+        Verwende einen Task-Scheduler. Es gibt zwei Hauptansätze:
+
+            Cronjob: Lege einen Cronjob an, der das Skript regelmäßig ausführt.
+
+            Integrierte Scheduler-Bibliothek in Python: z. B. schedule oder APScheduler.
+
+        Teste beide Ansätze und entscheide, welcher am besten zu deinen Anforderungen passt.
+
+    Beispiel Cronjob:
+
+    crontab -e
+    # Füge folgende Zeile hinzu, um das Skript alle 10 Minuten auszuführen:
+    */10 * * * * /usr/bin/python3 /home/pi/smartmeter_project/fetch_and_store.py
+
+5. Webinterface zur Visualisierung
+5.1. Auswahl des Web-Frameworks
+
+    Ziel: Das Webinterface bauen. Zum Beispiel eignet sich Flask als leichtgewichtiges Python-Framework.
+
+    Aufgaben:
+
+        Erstelle eine Flask-Anwendung, die die Daten aus der Datenbank abruft.
+
+        Definiere Routen/URLs, um die Daten anzuzeigen.
+
+        Erstelle HTML-Templates, z. B. mit Jinja2 (welches standardmäßig in Flask enthalten ist).
+
+5.2. Daten grafisch aufbereiten
+
+    Ziel: Die Daten sollen in ansprechenden Diagrammen oder Tabellen dargestellt werden.
+
+    Aufgaben:
+
+        Entscheide, ob du eine einfache HTML-Tabelle oder eine grafische Darstellung (z. B. mit Chart.js, D3.js oder Plotly) nutzen möchtest.
+
+        Implementiere die nötige JavaScript-Bibliothek in deinen HTML-Templates.
+
+        Binde die in der Datenbank abgelegten Daten in die Darstellung ein.
+
+5.3. Testen und Debuggen des Webinterfaces
+
+    Ziel: Sicherstellen, dass das Webinterface korrekt startet und die aktuellen Log-Daten anzeigt.
+
+    Aufgaben:
+
+        Starte die Flask-Anwendung (z. B. über flask run) und besuche die entsprechende URL (z. B. http://localhost:5000).
+
+        Füge Debugging-Ausgaben hinzu, falls die Daten nicht angezeigt werden.
+
+        Teste das Layout und das visuelle Design.
+
+6. Integration und Systemtests
+6.1. Integration aller Komponenten
+
+    Ziel: Alle Module (FTP-Abruf, XML-Parsing, Datenbankintegration, Webinterface) laufen zusammenspielend auf dem Raspberry Pi.
+
+    Aufgaben:
+
+        Entwickle ein Master-Skript bzw. ordne die einzelnen Skripte so, dass sie reibungslos zusammenarbeiten.
+
+        Stelle sicher, dass bei Fehlern (z. B. kein Abruf der Logdatei) entsprechende Logs generiert werden.
+
+6.2. Langzeittest
+
+    Ziel: Überprüfe, dass das System auch über längere Zeit stabil läuft.
+
+    Aufgaben:
+
+        Starte den Cronjob oder Scheduler und beobachte, ob die regelmäßigen Abrufe funktionieren.
+
+        Stelle sicher, dass das Webinterface auch nach dem Abruf aktueller ist.
+
+Zusammenfassung der Projektschritte
+
+    Vorbereitung und Setup
+
+        Installation aller nötigen Pakete und Erstellung eines Projektverzeichnisses.
+
+    FTP-Abruf-Skript entwickeln
+
+        Verbindungsaufbau zum Smartmeter und Herunterladen der XML-Logdatei.
+
+    XML-Daten parsen und in Datenbank speichern
+
+        Erstellen des Datenbankschemas, Parsen der XML-Datei und Speichern der extrahierten Daten.
+
+    Periodischen Abruf einrichten
+
+        Automatisierung mit einem Cronjob oder Python-Scheduler.
+
+    Webinterface entwickeln
+
+        Aufbau einer Flask-App, die Daten aus der Datenbank abruft und grafisch darstellt.
+
+    Integration & Systemtests
+
+        Zusammenführung aller Komponenten und langfristige Überwachung.

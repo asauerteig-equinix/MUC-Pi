@@ -1,0 +1,16 @@
+[Unit]
+Description=Smartmeter Flask Application
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/smartmeter_project
+ExecStart=/home/pi/smartmeter_project/venv/bin/python /home/pi/smartmeter_project/app.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}Fehler{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-5">
+    <div class="col-lg-6">
+        <div class="card sensor-card border-danger">
+            <div class="card-body text-center py-5">
+                <i class="bi bi-exclamation-triangle text-danger" style="font-size: 3em; display: block; margin-bottom: 1rem;"></i>
+                <h4 class="card-title text-danger mb-3">Fehler aufgetreten</h4>
+                <p class="card-text text-muted mb-4">
+                    {{ error }}
+                </p>
+                <p class="card-text small text-muted mb-4">
+                    <strong>Mögliche Lösungen:</strong><br>
+                    • Überprüfen Sie die Datenbankverbindung<br>
+                    • Starten Sie die Anwendung neu<br>
+                    • Prüfen Sie die Logdateien
+                </p>
+                <a href="/" class="btn btn-primary">
+                    <i class="bi bi-house"></i> Zurück zum Dashboard
+                </a>
+                <a href="/sensors" class="btn btn-secondary ms-2">
+                    <i class="bi bi-sliders"></i> Zu den Sensoren
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

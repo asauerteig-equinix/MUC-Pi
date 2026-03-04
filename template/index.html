@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block title %}Smartmeter Dashboard{% endblock %}
+
+{% block content %}
+<h1 class="mb-4"><i class="bi bi-graph-up"></i> Größerentemperatur-Monitor</h1>
+
+<div class="alert alert-info" role="alert">
+    <i class="bi bi-info-circle"></i> <strong>Live Daten:</strong> Die Diagramme werden aktualisiert sobald neue Messdaten verfügbar sind.
+</div>
+
+{% if sensors_data %}
+    {% for sensor in sensors_data %}
+    <div class="card sensor-card">
+        <div class="card-header bg-gradient">
+            <h5 class="mb-0">{{ sensor.sensor_name }}</h5>
+            <small class="text-muted">Device ID: {{ sensor.device_id }}</small>
+        </div>
+        <div class="card-body">
+            <!-- Aktuelle Messwerte -->
+            <div class="current-stats">
+                <div class="stat-item">
+                    <i class="bi bi-thermometer" style="font-size: 1.5em;"></i>
+                    <div class="stat-label">Temperatur</div>
+                    <div class="stat-value">{{ sensor.latest_temp }}°C</div>
+                </div>
+                <div class="stat-item">
+                    <i class="bi bi-cloud-rain" style="font-size: 1.5em;"></i>
+                    <div class="stat-label">Luftfeuchtigkeit</div>
+                    <div class="stat-value">{{ sensor.latest_hum }}%</div>
+                </div>
+                <div class="stat-item">
+                    <i class="bi bi-clock" style="font-size: 1.5em;"></i>
+                    <div class="stat-label">Letzter Update</div>
+                    <div class="stat-value" style="font-size: 1.1em;">{{ sensor.latest_time }}</div>
+                </div>
+            </div>
+
+            <!-- Diagramme mit Tabs -->
+            <div class="mt-4">
+                <div class="chart-tabs">
+                    <button class="chart-tab-btn active" onclick="showChart(this, 'chart-1h-{{ loop.index }}')">1 Stunde</button>
+                    <button class="chart-tab-btn" onclick="showChart(this, 'chart-1d-{{ loop.index }}')">1 Tag</button>
+                    <button class="chart-tab-btn" onclick="showChart(this, 'chart-7d-{{ loop.index }}')">7 Tage</button>
+                    <button class="chart-tab-btn" onclick="showChart(this, 'chart-1m-{{ loop.index }}')">30 Tage</button>
+                </div>
+
+                <div class="chart-container" id="chart-1h-{{ loop.index }}" style="height: 350px;"></div>
+                <div class="chart-container" id="chart-1d-{{ loop.index }}" style="height: 350px; display: none;"></div>
+                <div class="chart-container" id="chart-7d-{{ loop.index }}" style="height: 350px; display: none;"></div>
+                <div class="chart-container" id="chart-1m-{{ loop.index }}" style="height: 350px; display: none;"></div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle"></i> <strong>Keine Sensoren konfiguriert!</strong>
+        <a href="/sensors" class="alert-link">Klicken Sie hier, um Sensoren hinzuzufügen.</a>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showChart(button, chartId) {
+    // Hide all charts in the same sensor
+    const container = button.closest('.mt-4');
+    const charts = container.querySelectorAll('.chart-container');
+    charts.forEach(chart => chart.style.display = 'none');
+    
+    // Show selected chart
+    document.getElementById(chartId).style.display = 'block';
+    
+    // Update active button
+    const buttons = container.querySelectorAll('.chart-tab-btn');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    button.classList.add('active');
+    
+    // Redraw chart for responsive design
+    Plotly.Plots.resize(chartId);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    function plotChart(divId, times, temps, hums, title) {
+        const dates = times.map(t => new Date(t).toISOString());
+        
+        const traceTemp = {
+            x: dates,
+            y: temps,
+            mode: 'lines+markers',
+            name: 'Temperatur (°C)',
+            line: { color: '#ff6b6b', width: 2 },
+            marker: { size: 4 }
+        };
+        
+        const traceHum = {
+            x: dates,
+            y: hums,
+            yaxis: 'y2',
+            mode: 'lines+markers',
+            name: 'Luftfeuchtigkeit (%)',
+            line: { color: '#4dabf7', width: 2 },
+            marker: { size: 4 }
+        };
+        
+        const data = [traceTemp, traceHum];
+        
+        const layout = {
+            title: title,
+            hovermode: 'x unified',
+            xaxis: {
+                title: 'Zeit',
+                type: 'date'
+            },
+            yaxis: {
+                title: 'Temperatur (°C)',
+                titlefont: { color: '#ff6b6b' },
+                tickfont: { color: '#ff6b6b' }
+            },
+            yaxis2: {
+                title: 'Luftfeuchtigkeit (%)',
+                titlefont: { color: '#4dabf7' },
+                tickfont: { color: '#4dabf7' },
+                overlaying: 'y',
+                side: 'right'
+            },
+            margin: { l: 60, r: 60, t: 40, b: 40 },
+            legend: { x: 0, y: -0.2, orientation: 'h' }
+        };
+        
+        const config = { responsive: true, displayModeBar: false };
+        Plotly.newPlot(divId, data, layout, config);
+    }
+
+    {% for sensor in sensors_data %}
+        plotChart('chart-1h-{{ loop.index }}', {{ sensor.times_1h | tojson }}, {{ sensor.temps_1h | tojson }}, {{ sensor.hums_1h | tojson }}, 'Letzte Stunde');
+        plotChart('chart-1d-{{ loop.index }}', {{ sensor.times_1d | tojson }}, {{ sensor.temps_1d | tojson }}, {{ sensor.hums_1d | tojson }}, 'Letzter Tag');
+        plotChart('chart-7d-{{ loop.index }}', {{ sensor.times_7d | tojson }}, {{ sensor.temps_7d | tojson }}, {{ sensor.hums_7d | tojson }}, '7 Tage');
+        plotChart('chart-1m-{{ loop.index }}', {{ sensor.times_1m | tojson }}, {{ sensor.temps_1m | tojson }}, {{ sensor.hums_1m | tojson }}, '30 Tage');
+    {% endfor %}
+});
+</script>
+{% endblock %}

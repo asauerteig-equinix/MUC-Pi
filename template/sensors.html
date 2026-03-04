@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block title %}Sensoren verwalten{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <h1><i class="bi bi-sliders"></i> Sensoren verwalten</h1>
+    </div>
+</div>
+
+<!-- Alert Container -->
+<div id="alertContainer"></div>
+
+<!-- Neuer Sensor hinzufügen -->
+<div class="row mb-5">
+    <div class="col-lg-8">
+        <div class="sensor-form-card">
+            <h5 class="mb-4"><i class="bi bi-plus-circle"></i> Neuen Sensor hinzufügen</h5>
+            <form id="sensorForm">
+                <div class="mb-3">
+                    <label for="deviceIdInput" class="form-label">Device ID</label>
+                    <input type="text" class="form-control" id="deviceIdInput" 
+                           placeholder="z.B. WEP-00004606-02-27" required>
+                    <small class="form-text text-muted">Vollständige Device ID des Sensors</small>
+                </div>
+                <div class="mb-3">
+                    <label for="sensorNameInput" class="form-label">Sensor Name</label>
+                    <input type="text" class="form-control" id="sensorNameInput" 
+                           placeholder="z.B. Outdoor Temperatur" required>
+                    <small class="form-text text-muted">Ein aussagekräftiger Name für diesen Sensor</small>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-device-ssd"></i> Sensor hinzufügen
+                </button>
+                <button type="reset" class="btn btn-secondary ms-2">
+                    <i class="bi bi-arrow-counterclockwise"></i> Zurücksetzen
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Sensoren Liste -->
+<div class="row">
+    <div class="col-lg-10">
+        <div class="card sensor-card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-table"></i> Konfigurierte Sensoren</h5>
+            </div>
+            <div class="card-body">
+                {% if sensors %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Sensor Name</th>
+                                    <th>Device ID</th>
+                                    <th style="width: 150px;">Aktionen</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sensorsTableBody">
+                                {% for sensor in sensors %}
+                                <tr class="sensor-row" data-device-id="{{ sensor.device_id }}">
+                                    <td>
+                                        <strong>{{ sensor.sensor_name }}</strong>
+                                    </td>
+                                    <td>
+                                        <code>{{ sensor.device_id }}</code>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-warning" onclick="editSensor('{{ sensor.device_id }}', '{{ sensor.sensor_name }}')">
+                                            <i class="bi bi-pencil"></i> Bearbeiten
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" onclick="deleteSensor('{{ sensor.device_id }}', '{{ sensor.sensor_name }}')">
+                                            <i class="bi bi-trash"></i> Löschen
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-info-circle"></i> <strong>Keine Sensoren vorhanden.</strong>
+                        Fügen Sie oben einen neuen Sensor hinzu.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil"></i> Sensor bearbeiten</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editForm">
+                <div class="modal-body">
+                    <input type="hidden" id="editDeviceId">
+                    <div class="mb-3">
+                        <label for="editSensorName" class="form-label">Sensor Name</label>
+                        <input type="text" class="form-control" id="editSensorName" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check"></i> Speichern
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const editModal = new bootstrap.Modal(document.getElementById('editModal'));
+
+function showAlert(message, type = 'info') {
+    const alertContainer = document.getElementById('alertContainer');
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    alertContainer.appendChild(alert);
+    
+    setTimeout(() => {
+        alert.remove();
+    }, 5000);
+}
+
+document.getElementById('sensorForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const deviceId = document.getElementById('deviceIdInput').value.trim();
+    const sensorName = document.getElementById('sensorNameInput').value.trim();
+    
+    try {
+        const response = await fetch('/api/sensor/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ device_id: deviceId, sensor_name: sensorName })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showAlert(`<i class="bi bi-check-circle"></i> <strong>${sensorName}</strong> wurde hinzugefügt!`, 'success');
+            document.getElementById('sensorForm').reset();
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showAlert(`<i class="bi bi-exclamation-circle"></i> Fehler: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        showAlert(`<i class="bi bi-exclamation-circle"></i> Fehler: ${error.message}`, 'danger');
+    }
+});
+
+function editSensor(deviceId, sensorName) {
+    document.getElementById('editDeviceId').value = deviceId;
+    document.getElementById('editSensorName').value = sensorName;
+    editModal.show();
+}
+
+document.getElementById('editForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const deviceId = document.getElementById('editDeviceId').value;
+    const sensorName = document.getElementById('editSensorName').value.trim();
+    
+    try {
+        const response = await fetch('/api/sensor/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ device_id: deviceId, sensor_name: sensorName })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showAlert(`<i class="bi bi-check-circle"></i> <strong>${sensorName}</strong> wurde aktualisiert!`, 'success');
+            editModal.hide();
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showAlert(`<i class="bi bi-exclamation-circle"></i> Fehler: ${data.error}`, 'danger');
+        }
+    } catch (error) {
+        showAlert(`<i class="bi bi-exclamation-circle"></i> Fehler: ${error.message}`, 'danger');
+    }
+});
+
+function deleteSensor(deviceId, sensorName) {
+    if (confirm(`Möchten Sie wirklich "${sensorName}" löschen? Alle zugehörigen Daten werden gelöscht!`)) {
+        fetch(`/api/sensor/delete/${encodeURIComponent(deviceId)}`, { method: 'DELETE' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert(`<i class="bi bi-check-circle"></i> <strong>${sensorName}</strong> wurde gelöscht!`, 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showAlert(`<i class="bi bi-exclamation-circle"></i> Fehler: ${data.error}`, 'danger');
+                }
+            })
+            .catch(error => {
+                showAlert(`<i class="bi bi-exclamation-circle"></i> Fehler: ${error.message}`, 'danger');
+            });
+    }
+}
+</script>
+{% endblock %}
