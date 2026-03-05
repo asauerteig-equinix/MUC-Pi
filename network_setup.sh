@@ -185,10 +185,32 @@ echo ""
 log_info "Installiere iptables-persistent..."
 DEBIAN_FRONTEND=noninteractive apt-get install -y iptables-persistent
 
-# Schritt 6: IP Forwarding aktivieren
+# Schritt 6: IP Forwarding aktivieren (WICHTIG für Port-Weiterleitung!)
 log_info "Aktiviere IP Forwarding..."
+
+# Sofort aktivieren
+sysctl -w net.ipv4.ip_forward=1
+
+# Persistent machen via separate Datei (zuverlässiger als /etc/sysctl.conf)
+cat > /etc/sysctl.d/99-smartmeter-forward.conf << 'EOF'
+# IP Forwarding für Smartmeter Bridge
+net.ipv4.ip_forward=1
+net.ipv4.icmp_echo_ignore_broadcasts=0
+EOF
+
+# Auch in sysctl.conf falls noch nicht vorhanden (Backup)
 append_once "net.ipv4.ip_forward=1" /etc/sysctl.conf
-sysctl -p >/dev/null
+
+# Alle sysctl Einstellungen neu laden
+sysctl --system >/dev/null 2>&1
+
+# Verifizieren
+if [ "$(cat /proc/sys/net/ipv4/ip_forward)" = "1" ]; then
+    log_info "IP Forwarding erfolgreich aktiviert ✓"
+else
+    log_error "IP Forwarding konnte nicht aktiviert werden!"
+    log_warn "Manuell ausführen: sudo sysctl -w net.ipv4.ip_forward=1"
+fi
 
 # Schritt 7: iptables Rules
 log_info "Konfiguriere iptables Regeln..."
@@ -206,20 +228,15 @@ iptables -A FORWARD -i $ETH_IF -o $WIFI_IF -j ACCEPT
 # NAT (Masquerading)
 iptables -t nat -A POSTROUTING -o $WIFI_IF -j MASQUERADE
 
-# Port Forwarding: 8080 → MUC:502 (MUC läuft auf Port 502)
+# Port Forwarding: 8080 → MUC:80 (MUC Webinterface läuft auf Port 80)
 # Externe Anfragen auf Port 8080 werden zum MUC weitergeleitet
-iptables -t nat -A PREROUTING -p tcp --dport 8080 -j DNAT --to-destination 192.168.100.101:502
-iptables -t nat -A POSTROUTING -p tcp --dport 502 -d 192.168.100.101 -j SNAT --to-source 192.168.100.1
-iptables -A FORWARD -p tcp --dport 502 -d 192.168.100.101 -j ACCEPT
+iptables -t nat -A PREROUTING -p tcp --dport 8080 -j DNAT --to-destination 192.168.100.101:80
+iptables -t nat -A POSTROUTING -p tcp --dport 80 -d 192.168.100.101 -j SNAT --to-source 192.168.100.1
+iptables -A FORWARD -p tcp --dport 80 -d 192.168.100.101 -j ACCEPT
 
 # Speichere iptables Regeln
 iptables-save > /etc/iptables/rules.v4
 log_info "iptables Regeln gespeichert"
-
-# Schritt 8: Broadcasting auf Ethernet aktivieren
-log_info "Aktiviere Broadcasting..."
-append_once "net.ipv4.icmp_echo_ignore_broadcasts=0" /etc/sysctl.conf
-sysctl -p >/dev/null
 
 echo ""
 echo "================================================================"
@@ -232,7 +249,7 @@ echo "  Ethernet Interface: $ETH_IF (Statisch 192.168.100.1/24)"
 echo "  Hostname:           muc"
 echo "  Netzwerk-Service:   $NETWORK_SERVICE"
 echo "  IP Forwarding:      Aktiviert"
-echo "  Port Forwarding:    8080 → MUC:502"
+echo "  Port Forwarding:    8080 → MUC:80"
 echo ""
 echo "Accesso:"
 echo "  Smartmeter Dashboard:  http://muc"

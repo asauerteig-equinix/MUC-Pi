@@ -1,25 +1,23 @@
 #!/bin/bash
-# Manual Data Import - Lädt alle historischen Logdateien
-# Wird einmalig zur Initialisierung ausgeführt
+# Manual Data Import - Interaktiver Import mit Zeitraum-Optionen
+# Laden Sie alle oder ausgewählte historische Logdateien herunter
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR"
 
-# Virtuelle Umgebung aktivieren (falls vorhanden)
+echo "========================================"
+echo "SMARTMETER - Manueller Datenimport"
+echo "========================================"
+echo ""
+
+# Prüfe ob venv existiert
 if [ -f "venv/bin/activate" ]; then
     source venv/bin/activate
+else
+    echo "⚠️  Warnung: Virtuelle Umgebung nicht gefunden"
 fi
 
-/usr/bin/python3 << 'EOF'
-import sys
-sys.path.insert(0, '/home/pi/smartmeter_project')
-from ftp_handler import manual_import_all_logfiles
+# Führe das interaktive Importskript aus
+python3 interactive_import.py
 
-print("Starte manuellen Import aller Logdateien...")
-success = manual_import_all_logfiles()
-if success:
-    print("Import erfolgreich abgeschlossen!")
-else:
-    print("Import fehlgeschlagen!")
-    sys.exit(1)
-EOF
+exit $?

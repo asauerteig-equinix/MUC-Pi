@@ -171,6 +171,68 @@ def get_measurements(device_id, time_range_seconds):
         logger.error(f"Fehler beim Abrufen der Messungen: {e}")
         return []
 
+def get_all_measurements(limit=1000, offset=0):
+    """Holt alle Messungen mit Pagination."""
+    try:
+        conn = get_db_connection()
+        measurements = conn.execute(
+            "SELECT m.*, s.sensor_name FROM measurements m LEFT JOIN sensors s ON m.device_id = s.device_id ORDER BY m.timestamp DESC LIMIT ? OFFSET ?",
+            (limit, offset)
+        ).fetchall()
+        conn.close()
+        return measurements
+    except Exception as e:
+        logger.error(f"Fehler beim Abrufen aller Messungen: {e}")
+        return []
+
+def get_measurements_count():
+    """Holt die Gesamtanzahl der Messungen."""
+    try:
+        conn = get_db_connection()
+        count = conn.execute("SELECT COUNT(*) as total FROM measurements").fetchone()
+        conn.close()
+        return count['total'] if count else 0
+    except Exception as e:
+        logger.error(f"Fehler beim Zählen der Messungen: {e}")
+        return 0
+
+def update_measurement(measurement_id, temperature, humidity):
+    """Aktualisiert Temperatur und Luftfeuchtigkeit einer Messung."""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute(
+            "UPDATE measurements SET temperature = ?, humidity = ? WHERE id = ?",
+            (temperature, humidity, measurement_id)
+        )
+        conn.commit()
+        rows_changed = c.rowcount
+        conn.close()
+        if rows_changed > 0:
+            logger.info(f"Messung {measurement_id} aktualisiert")
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"Fehler beim Aktualisieren der Messung: {e}")
+        return False
+
+def delete_measurement(measurement_id):
+    """Löscht eine einzelne Messung."""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("DELETE FROM measurements WHERE id = ?", (measurement_id,))
+        conn.commit()
+        rows_changed = c.rowcount
+        conn.close()
+        if rows_changed > 0:
+            logger.info(f"Messung {measurement_id} gelöscht")
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"Fehler beim Löschen der Messung: {e}")
+        return False
+
 def insert_measurement(device_id, timestamp, temperature, humidity):
     """Fügt eine neue Messung in die Datenbank ein."""
     try:

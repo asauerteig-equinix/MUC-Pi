@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}Datenbank Verwaltung - Smartmeter Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-lg">
+    <h1 class="mb-4">
+        <i class="bi bi-database"></i> Datenverwaltung
+    </h1>
+
+    <!-- Statistiken -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Gesamte Messungen</h5>
+                    <p class="card-text display-6">{{ total_count }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Seite</h5>
+                    <p class="card-text display-6">{{ page }} / {{ total_pages }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabelle mit Messungen -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Messungen - Seite {{ page }}</h5>
+        </div>
+        <div class="card-body">
+            {% if measurements %}
+            <div class="table-responsive">
+                <table class="table table-hover table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Sensor</th>
+                            <th>Zeitstempel</th>
+                            <th>Temperatur (°C)</th>
+                            <th>Luftfeuchtigkeit (%)</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody id="measurementTable">
+                        {% for measurement in measurements %}
+                        <tr id="row-{{ measurement.id }}" data-id="{{ measurement.id }}">
+                            <td>{{ measurement.id }}</td>
+                            <td>{{ measurement.sensor_name or measurement.device_id }}</td>
+                            <td>
+                                <small>
+                                    {% if measurement.timestamp %}
+                                        {{ measurement.timestamp | strftime('%Y-%m-%d %H:%M:%S') }}
+                                    {% else %}
+                                        N/A
+                                    {% endif %}
+                                </small>
+                            </td>
+                            <td>
+                                <input type="number" class="form-control form-control-sm temp-input" 
+                                       value="{{ measurement.temperature or 0 }}" step="0.1" placeholder="Temp">
+                            </td>
+                            <td>
+                                <input type="number" class="form-control form-control-sm humidity-input" 
+                                       value="{{ measurement.humidity or 0 }}" step="0.1" max="100" placeholder="Hum">
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-warning edit-btn" data-id="{{ measurement.id }}">
+                                    <i class="bi bi-pencil"></i> Speichern
+                                </button>
+                                <button class="btn btn-sm btn-danger delete-btn" data-id="{{ measurement.id }}">
+                                    <i class="bi bi-trash"></i> Löschen
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> Keine Messungen in der Datenbank vorhanden.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <nav aria-label="Pagination" class="mt-4">
+        <ul class="pagination">
+            {% if page > 1 %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1">Erste</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page - 1 }}">← Zurück</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">Erste</span>
+            </li>
+            <li class="page-item disabled">
+                <span class="page-link">← Zurück</span>
+            </li>
+            {% endif %}
+
+            <!-- Page Numbers -->
+            {% for p in range(max(1, page - 2), min(total_pages + 1, page + 3)) %}
+                {% if p == page %}
+                <li class="page-item active">
+                    <span class="page-link">{{ p }}</span>
+                </li>
+                {% else %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ p }}">{{ p }}</a>
+                </li>
+                {% endif %}
+            {% endfor %}
+
+            {% if page < total_pages %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page + 1 }}">Weiter →</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ total_pages }}">Letzte</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled">
+                <span class="page-link">Weiter →</span>
+            </li>
+            <li class="page-item disabled">
+                <span class="page-link">Letzte</span>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+<!-- Modal für Bestätigung -->
+<div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmTitle">Bestätigung</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="confirmMessage"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-danger" id="confirmBtn">Bestätigen</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+
+// Edit Button Handler
+document.querySelectorAll('.edit-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const row = this.closest('tr');
+        const id = this.dataset.id;
+        const temp = row.querySelector('.temp-input').value;
+        const humidity = row.querySelector('.humidity-input').value;
+
+        // Validate
+        if (isNaN(temp) || isNaN(humidity)) {
+            alert('Bitte geben Sie gültige Zahlen ein');
+            return;
+        }
+
+        // Show confirmation
+        document.getElementById('confirmTitle').textContent = 'Messung speichern?';
+        document.getElementById('confirmMessage').textContent = 
+            `Möchten Sie diese Messung wirklich aktualisieren?\n\nTemperatur: ${temp}°C\nLuftfeuchtigkeit: ${humidity}%`;
+        
+        document.getElementById('confirmBtn').onclick = function() {
+            updateMeasurement(id, temp, humidity);
+            confirmModal.hide();
+        };
+        
+        confirmModal.show();
+    });
+});
+
+// Delete Button Handler
+document.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const id = this.dataset.id;
+        
+        document.getElementById('confirmTitle').textContent = 'Messung löschen?';
+        document.getElementById('confirmMessage').textContent = 
+            'Diese Messung wird endgültig gelöscht. Dieser Vorgang kann nicht rückgängig gemacht werden.';
+        
+        document.getElementById('confirmBtn').onclick = function() {
+            deleteMeasurement(id);
+            confirmModal.hide();
+        };
+        
+        confirmModal.show();
+    });
+});
+
+// Update Measurement
+function updateMeasurement(id, temp, humidity) {
+    fetch(`/api/data/update/${id}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            temperature: parseFloat(temp),
+            humidity: parseFloat(humidity)
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Messung aktualisiert', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showNotification(`Fehler: ${data.error}`, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification(`Fehler: ${error}`, 'danger');
+    });
+}
+
+// Delete Measurement
+function deleteMeasurement(id) {
+    fetch(`/api/data/delete/${id}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Messung gelöscht', 'success');
+            document.getElementById(`row-${id}`).remove();
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showNotification(`Fehler: ${data.error}`, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification(`Fehler: ${error}`, 'danger');
+    });
+}
+
+// Notification Helper
+function showNotification(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+    alertDiv.style.zIndex = '9999';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 3000);
+}
+</script>
+
+<!-- Custom Jinja2 Filter für Datum -->
+<script>
+// Da Jinja2 strftime nicht immer verfügbar ist, verwenden wir JavaScript
+document.querySelectorAll('td small').forEach(cell => {
+    const timestamp = parseInt(cell.textContent.trim());
+    if (!isNaN(timestamp) && timestamp > 0) {
+        const date = new Date(timestamp * 1000);
+        cell.textContent = date.toLocaleString('de-DE');
+    }
+});
+</script>
+
+{% endblock %}

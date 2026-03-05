@@ -39,6 +39,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="/data">
+                            <i class="bi bi-database"></i> Daten
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <button class="nav-link btn btn-link" id="themeToggleBtn" onclick="toggleTheme()">
                             <i class="bi bi-moon-stars"></i> Dunkel
                         </button>
@@ -62,8 +67,73 @@
 
     <!-- Bootstrap 5 JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- Theme Toggle -->
-    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    
+    <!-- Theme Toggle - Inline für zuverlässige Ausführung -->
+    <script>
+    // Theme Toggle Functions
+    function initTheme() {
+        const savedTheme = getCookie('theme') || 'light';
+        applyTheme(savedTheme);
+    }
+
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-bs-theme', theme);
+        document.body.setAttribute('data-bs-theme', theme);
+        setCookie('theme', theme, 365);
+        updateThemeButton(theme);
+        
+        // Auch navbar und footer anpassen
+        const navbar = document.querySelector('.navbar');
+        const footer = document.querySelector('footer');
+        if (navbar) {
+            navbar.classList.toggle('navbar-dark', theme === 'dark');
+            navbar.classList.toggle('navbar-light', theme === 'light');
+            navbar.classList.toggle('bg-dark', theme === 'dark');
+            navbar.classList.toggle('bg-light', theme === 'light');
+        }
+        if (footer) {
+            footer.classList.toggle('bg-dark', theme === 'dark');
+            footer.classList.toggle('bg-light', theme === 'light');
+        }
+    }
+
+    function toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-bs-theme') || 'light';
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+        applyTheme(newTheme);
+    }
+
+    function updateThemeButton(theme) {
+        const btn = document.getElementById('themeToggleBtn');
+        if (btn) {
+            btn.innerHTML = theme === 'light' 
+                ? '<i class="bi bi-moon-stars"></i> Dunkel' 
+                : '<i class="bi bi-sun"></i> Hell';
+        }
+    }
+
+    function setCookie(name, value, days) {
+        const expires = new Date();
+        expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+        document.cookie = name + '=' + value + ';expires=' + expires.toUTCString() + ';path=/';
+    }
+
+    function getCookie(name) {
+        const nameEQ = name + '=';
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            let cookie = cookies[i].trim();
+            if (cookie.indexOf(nameEQ) === 0) {
+                return cookie.substring(nameEQ.length);
+            }
+        }
+        return null;
+    }
+
+    // Initiales Theme beim Laden anwenden
+    document.addEventListener('DOMContentLoaded', initTheme);
+    </script>
+    
     {% block extra_js %}{% endblock %}
 </body>
 </html>
