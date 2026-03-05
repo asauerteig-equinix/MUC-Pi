@@ -274,16 +274,4 @@ function showNotification(message, type) {
 }
 </script>
 
-<!-- Custom Jinja2 Filter für Datum -->
-<script>
-// Da Jinja2 strftime nicht immer verfügbar ist, verwenden wir JavaScript
-document.querySelectorAll('td small').forEach(cell => {
-    const timestamp = parseInt(cell.textContent.trim());
-    if (!isNaN(timestamp) && timestamp > 0) {
-        const date = new Date(timestamp * 1000);
-        cell.textContent = date.toLocaleString('de-DE');
-    }
-});
-</script>
-
 {% endblock %}

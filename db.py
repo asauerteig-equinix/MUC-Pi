@@ -47,6 +47,7 @@ def _create_database():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 device_id TEXT UNIQUE NOT NULL,
                 sensor_name TEXT NOT NULL,
+                sort_order INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -78,15 +79,40 @@ def _create_database():
         raise
 
 def get_sensors():
-    """Holt alle konfigurierten Sensoren."""
+    """Holt alle konfigurierten Sensoren, sortiert nach sort_order."""
     try:
         conn = get_db_connection()
-        sensors = conn.execute("SELECT * FROM sensors ORDER BY sensor_name").fetchall()
+        # Migration: sort_order Spalte hinzufügen falls nicht vorhanden
+        try:
+            conn.execute("SELECT sort_order FROM sensors LIMIT 1")
+        except sqlite3.OperationalError:
+            conn.execute("ALTER TABLE sensors ADD COLUMN sort_order INTEGER DEFAULT 0")
+            conn.commit()
+        
+        sensors = conn.execute("SELECT * FROM sensors ORDER BY sort_order ASC, sensor_name ASC").fetchall()
         conn.close()
         return sensors
     except Exception as e:
         logger.error(f"Fehler beim Abrufen der Sensoren: {e}")
         return []
+
+def update_sensor_order(device_id, sort_order):
+    """Aktualisiert die Reihenfolge eines Sensors."""
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("UPDATE sensors SET sort_order = ? WHERE device_id = ?",
+                  (sort_order, device_id))
+        conn.commit()
+        rows_changed = c.rowcount
+        conn.close()
+        if rows_changed > 0:
+            logger.info(f"Sensor-Reihenfolge aktualisiert: {device_id} -> {sort_order}")
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"Fehler beim Aktualisieren der Sensor-Reihenfolge: {e}")
+        return False
 
 def add_sensor(device_id, sensor_name):
     """Fügt einen neuen Sensor hinzu."""

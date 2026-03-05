@@ -2,143 +2,463 @@
 
 {% block title %}Smartmeter Dashboard{% endblock %}
 
-{% block content %}
-<h1 class="mb-4"><i class="bi bi-graph-up"></i> Temperatur-Monitor</h1>
+{% block extra_css %}
+<style>
+/* Sensor Grid Layout */
+.sensor-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+    gap: 1.5rem;
+}
 
-<div class="alert alert-info" role="alert">
-    <i class="bi bi-info-circle"></i> <strong>Live Daten:</strong> Die Diagramme werden aktualisiert sobald neue Messdaten verfügbar sind.
+@media (max-width: 500px) {
+    .sensor-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Kompakte Stats */
+.stats-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.stat-box {
+    flex: 1;
+    padding: 0.75rem;
+    border-radius: 8px;
+    text-align: center;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+}
+
+:root[data-bs-theme="dark"] .stat-box {
+    background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+}
+
+.stat-box .value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin: 0;
+}
+
+.stat-box .label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    opacity: 0.7;
+    margin: 0;
+}
+
+/* Farbklassen für Werte */
+.stat-box.optimal {
+    border-color: #198754;
+    background: linear-gradient(135deg, #d1e7dd 0%, #badbcc 100%);
+}
+.stat-box.optimal .value { color: #198754; }
+
+.stat-box.too-cold, .stat-box.too-humid {
+    border-color: #0d6efd;
+    background: linear-gradient(135deg, #cfe2ff 0%, #b6d4fe 100%);
+}
+.stat-box.too-cold .value, .stat-box.too-humid .value { color: #0d6efd; }
+
+.stat-box.too-warm {
+    border-color: #dc3545;
+    background: linear-gradient(135deg, #f8d7da 0%, #f5c2c7 100%);
+}
+.stat-box.too-warm .value { color: #dc3545; }
+
+.stat-box.too-dry {
+    border-color: #ffc107;
+    background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%);
+}
+.stat-box.too-dry .value { color: #856404; }
+
+/* Dark Mode Farben */
+:root[data-bs-theme="dark"] .stat-box.optimal {
+    background: linear-gradient(135deg, #0f5132 0%, #0a3622 100%);
+}
+:root[data-bs-theme="dark"] .stat-box.too-cold,
+:root[data-bs-theme="dark"] .stat-box.too-humid {
+    background: linear-gradient(135deg, #084298 0%, #052c65 100%);
+}
+:root[data-bs-theme="dark"] .stat-box.too-warm {
+    background: linear-gradient(135deg, #842029 0%, #58151c 100%);
+}
+:root[data-bs-theme="dark"] .stat-box.too-dry {
+    background: linear-gradient(135deg, #664d03 0%, #332701 100%);
+}
+:root[data-bs-theme="dark"] .stat-box.too-dry .value { color: #ffc107; }
+
+/* Loading States */
+.loading-spinner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 200px;
+}
+
+.sensor-card {
+    opacity: 0;
+    animation: fadeIn 0.3s ease forwards;
+}
+
+@keyframes fadeIn {
+    to { opacity: 1; }
+}
+
+/* Chart Tabs - gleiches Design wie stat-boxes */
+.chart-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.chart-tab-btn {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    color: #495057;
+    transition: all 0.2s ease;
+}
+
+.chart-tab-btn:hover {
+    background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+    border-color: #adb5bd;
+}
+
+.chart-tab-btn.active {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    color: white;
+    border-color: #0d6efd;
+}
+
+:root[data-bs-theme="dark"] .chart-tab-btn {
+    background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+    color: #adb5bd;
+}
+
+:root[data-bs-theme="dark"] .chart-tab-btn:hover {
+    background: linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 100%);
+    border-color: #495057;
+}
+
+:root[data-bs-theme="dark"] .chart-tab-btn.active {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    color: white;
+}
+
+/* Time Info */
+.time-info {
+    font-size: 0.7rem;
+    opacity: 0.6;
+    text-align: right;
+    margin-top: -0.5rem;
+    margin-bottom: 0.5rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0"><i class="bi bi-graph-up"></i> Dashboard</h1>
+    <button class="btn btn-outline-secondary btn-sm" onclick="loadSensors()">
+        <i class="bi bi-arrow-clockwise"></i> Aktualisieren
+    </button>
 </div>
 
-{% if sensors_data %}
-    {% for sensor in sensors_data %}
-    <div class="card sensor-card">
-        <div class="card-header bg-gradient">
-            <h5 class="mb-0">{{ sensor.sensor_name }}</h5>
-            <small class="text-muted">Device ID: {{ sensor.device_id }}</small>
-        </div>
-        <div class="card-body">
-            <!-- Aktuelle Messwerte -->
-            <div class="current-stats">
-                <div class="stat-item">
-                    <i class="bi bi-thermometer" style="font-size: 1.5em;"></i>
-                    <div class="stat-label">Temperatur</div>
-                    <div class="stat-value">{{ sensor.latest_temp }}°C</div>
-                </div>
-                <div class="stat-item">
-                    <i class="bi bi-cloud-rain" style="font-size: 1.5em;"></i>
-                    <div class="stat-label">Luftfeuchtigkeit</div>
-                    <div class="stat-value">{{ sensor.latest_hum }}%</div>
-                </div>
-                <div class="stat-item">
-                    <i class="bi bi-clock" style="font-size: 1.5em;"></i>
-                    <div class="stat-label">Letzter Update</div>
-                    <div class="stat-value" style="font-size: 1.1em;">{{ sensor.latest_time }}</div>
-                </div>
-            </div>
-
-            <!-- Diagramme mit Tabs -->
-            <div class="mt-4">
-                <div class="chart-tabs">
-                    <button class="chart-tab-btn active" onclick="showChart(this, 'chart-1h-{{ loop.index }}')">1 Stunde</button>
-                    <button class="chart-tab-btn" onclick="showChart(this, 'chart-1d-{{ loop.index }}')">1 Tag</button>
-                    <button class="chart-tab-btn" onclick="showChart(this, 'chart-7d-{{ loop.index }}')">7 Tage</button>
-                    <button class="chart-tab-btn" onclick="showChart(this, 'chart-1m-{{ loop.index }}')">30 Tage</button>
-                </div>
-
-                <div class="chart-container" id="chart-1h-{{ loop.index }}" style="height: 350px;"></div>
-                <div class="chart-container" id="chart-1d-{{ loop.index }}" style="height: 350px; display: none;"></div>
-                <div class="chart-container" id="chart-7d-{{ loop.index }}" style="height: 350px; display: none;"></div>
-                <div class="chart-container" id="chart-1m-{{ loop.index }}" style="height: 350px; display: none;"></div>
-            </div>
+<!-- Sensor Container - wird dynamisch befüllt -->
+<div id="sensors-container" class="sensor-grid">
+    <div class="loading-spinner">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Laden...</span>
         </div>
     </div>
-    {% endfor %}
-{% else %}
+</div>
+
+<!-- Template für Sensor-Karten (wird per JS geklont) -->
+<template id="sensor-template">
+    <div class="card sensor-card">
+        <div class="card-header">
+            <h5 class="mb-0 sensor-name"></h5>
+            <small class="text-muted sensor-device-id"></small>
+        </div>
+        <div class="card-body">
+            <!-- Kompakte Stats in einer Reihe -->
+            <div class="stats-row">
+                <div class="stat-box temp-box">
+                    <p class="label"><i class="bi bi-thermometer"></i> Temperatur</p>
+                    <p class="value temp-value">--°C</p>
+                </div>
+                <div class="stat-box hum-box">
+                    <p class="label"><i class="bi bi-droplet"></i> Feuchtigkeit</p>
+                    <p class="value hum-value">--%</p>
+                </div>
+            </div>
+            <p class="time-info"><i class="bi bi-clock"></i> <span class="update-time">--</span></p>
+
+            <!-- Chart Tabs -->
+            <div class="chart-tabs">
+                <button class="chart-tab-btn active" data-range="1h">1h</button>
+                <button class="chart-tab-btn" data-range="1d">24h</button>
+                <button class="chart-tab-btn" data-range="7d">7T</button>
+                <button class="chart-tab-btn" data-range="30d">30T</button>
+            </div>
+            <div class="chart-area" style="height: 250px;"></div>
+        </div>
+    </div>
+</template>
+
+<!-- Keine Sensoren Template -->
+<template id="no-sensors-template">
     <div class="alert alert-warning">
         <i class="bi bi-exclamation-triangle"></i> <strong>Keine Sensoren konfiguriert!</strong>
         <a href="/sensors" class="alert-link">Klicken Sie hier, um Sensoren hinzuzufügen.</a>
     </div>
-{% endif %}
+</template>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-function showChart(button, chartId) {
-    // Hide all charts in the same sensor
-    const container = button.closest('.mt-4');
-    const charts = container.querySelectorAll('.chart-container');
-    charts.forEach(chart => chart.style.display = 'none');
-    
-    // Show selected chart
-    document.getElementById(chartId).style.display = 'block';
-    
-    // Update active button
-    const buttons = container.querySelectorAll('.chart-tab-btn');
-    buttons.forEach(btn => btn.classList.remove('active'));
-    button.classList.add('active');
-    
-    // Redraw chart for responsive design
-    Plotly.Plots.resize(chartId);
+// Globale Sensor-Daten
+let sensorsData = [];
+let chartCache = {};
+
+// Farbklasse für Temperatur bestimmen
+function getTempClass(temp) {
+    if (temp === null || temp === undefined) return '';
+    if (temp < 18) return 'too-cold';
+    if (temp > 26) return 'too-warm';
+    return 'optimal';
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    function plotChart(divId, times, temps, hums, title) {
-        const dates = times.map(t => new Date(t).toISOString());
-        
-        const traceTemp = {
-            x: dates,
-            y: temps,
-            mode: 'lines+markers',
-            name: 'Temperatur (°C)',
-            line: { color: '#ff6b6b', width: 2 },
-            marker: { size: 4 }
-        };
-        
-        const traceHum = {
-            x: dates,
-            y: hums,
-            yaxis: 'y2',
-            mode: 'lines+markers',
-            name: 'Luftfeuchtigkeit (%)',
-            line: { color: '#4dabf7', width: 2 },
-            marker: { size: 4 }
-        };
-        
-        const data = [traceTemp, traceHum];
-        
-        const layout = {
-            title: title,
-            hovermode: 'x unified',
-            xaxis: {
-                title: 'Zeit',
-                type: 'date'
-            },
-            yaxis: {
-                title: 'Temperatur (°C)',
-                titlefont: { color: '#ff6b6b' },
-                tickfont: { color: '#ff6b6b' }
-            },
-            yaxis2: {
-                title: 'Luftfeuchtigkeit (%)',
-                titlefont: { color: '#4dabf7' },
-                tickfont: { color: '#4dabf7' },
-                overlaying: 'y',
-                side: 'right'
-            },
-            margin: { l: 60, r: 60, t: 40, b: 40 },
-            legend: { x: 0, y: -0.2, orientation: 'h' }
-        };
-        
-        const config = { responsive: true, displayModeBar: false };
-        Plotly.newPlot(divId, data, layout, config);
-    }
+// Farbklasse für Luftfeuchtigkeit bestimmen
+function getHumClass(hum) {
+    if (hum === null || hum === undefined) return '';
+    if (hum < 30) return 'too-dry';
+    if (hum > 70) return 'too-humid';
+    return 'optimal';
+}
 
-    {% for sensor in sensors_data %}
-        plotChart('chart-1h-{{ loop.index }}', {{ sensor.times_1h | tojson }}, {{ sensor.temps_1h | tojson }}, {{ sensor.hums_1h | tojson }}, 'Letzte Stunde');
-        plotChart('chart-1d-{{ loop.index }}', {{ sensor.times_1d | tojson }}, {{ sensor.temps_1d | tojson }}, {{ sensor.hums_1d | tojson }}, 'Letzter Tag');
-        plotChart('chart-7d-{{ loop.index }}', {{ sensor.times_7d | tojson }}, {{ sensor.temps_7d | tojson }}, {{ sensor.hums_7d | tojson }}, '7 Tage');
-        plotChart('chart-1m-{{ loop.index }}', {{ sensor.times_1m | tojson }}, {{ sensor.temps_1m | tojson }}, {{ sensor.hums_1m | tojson }}, '30 Tage');
-    {% endfor %}
-});
+// Sensoren laden
+async function loadSensors() {
+    const container = document.getElementById('sensors-container');
+    container.innerHTML = `
+        <div class="loading-spinner">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Laden...</span>
+            </div>
+        </div>
+    `;
+    
+    try {
+        const response = await fetch('/api/dashboard/sensors');
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error || 'Fehler beim Laden');
+        }
+        
+        sensorsData = data.sensors;
+        renderSensors();
+        
+    } catch (error) {
+        console.error('Fehler:', error);
+        container.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i> Fehler beim Laden der Sensoren: ${error.message}
+            </div>
+        `;
+    }
+}
+
+// Sensoren rendern
+function renderSensors() {
+    const container = document.getElementById('sensors-container');
+    container.innerHTML = '';
+    
+    if (sensorsData.length === 0) {
+        const template = document.getElementById('no-sensors-template');
+        container.appendChild(template.content.cloneNode(true));
+        return;
+    }
+    
+    sensorsData.forEach((sensor, index) => {
+        const template = document.getElementById('sensor-template');
+        const card = template.content.cloneNode(true);
+        
+        // Sensor-Infos setzen
+        card.querySelector('.sensor-name').textContent = sensor.sensor_name;
+        card.querySelector('.sensor-device-id').textContent = `ID: ${sensor.device_id}`;
+        
+        // Werte setzen mit Farbklassen
+        const tempBox = card.querySelector('.temp-box');
+        const humBox = card.querySelector('.hum-box');
+        
+        if (sensor.latest_temp !== null) {
+            card.querySelector('.temp-value').textContent = `${sensor.latest_temp}°C`;
+            tempBox.classList.add(getTempClass(sensor.latest_temp));
+        } else {
+            card.querySelector('.temp-value').textContent = 'N/A';
+        }
+        
+        if (sensor.latest_hum !== null) {
+            card.querySelector('.hum-value').textContent = `${sensor.latest_hum}%`;
+            humBox.classList.add(getHumClass(sensor.latest_hum));
+        } else {
+            card.querySelector('.hum-value').textContent = 'N/A';
+        }
+        
+        card.querySelector('.update-time').textContent = sensor.latest_time;
+        
+        // Chart-Container ID setzen
+        const chartArea = card.querySelector('.chart-area');
+        chartArea.id = `chart-${index}`;
+        
+        // Tab-Buttons konfigurieren
+        const buttons = card.querySelectorAll('.chart-tab-btn');
+        buttons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                buttons.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                loadChart(sensor.device_id, this.dataset.range, `chart-${index}`);
+            });
+        });
+        
+        // Animation delay
+        const cardElement = card.querySelector('.sensor-card');
+        cardElement.style.animationDelay = `${index * 0.1}s`;
+        
+        container.appendChild(card);
+        
+        // Initialen Chart laden (1h)
+        loadChart(sensor.device_id, '1h', `chart-${index}`);
+    });
+}
+
+// Chart laden
+async function loadChart(deviceId, timerange, chartId) {
+    const cacheKey = `${deviceId}-${timerange}`;
+    const chartDiv = document.getElementById(chartId);
+    
+    // Loading anzeigen
+    chartDiv.innerHTML = `
+        <div class="loading-spinner" style="height: 250px;">
+            <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+        </div>
+    `;
+    
+    try {
+        // Cache prüfen (5 Minuten gültig)
+        const cached = chartCache[cacheKey];
+        let chartData;
+        
+        if (cached && (Date.now() - cached.timestamp < 300000)) {
+            chartData = cached.data;
+        } else {
+            const response = await fetch(`/api/dashboard/chart/${deviceId}/${timerange}`);
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.error || 'Fehler beim Laden');
+            }
+            
+            chartData = data;
+            chartCache[cacheKey] = { data: chartData, timestamp: Date.now() };
+        }
+        
+        renderChart(chartId, chartData.times, chartData.temps, chartData.hums, timerange);
+        
+    } catch (error) {
+        console.error('Chart-Fehler:', error);
+        chartDiv.innerHTML = `<div class="text-muted text-center py-5">Keine Daten verfügbar</div>`;
+    }
+}
+
+// Chart rendern
+function renderChart(divId, times, temps, hums, timerange) {
+    if (times.length === 0) {
+        document.getElementById(divId).innerHTML = `
+            <div class="text-muted text-center py-5">
+                <i class="bi bi-graph-down"></i> Keine Daten für diesen Zeitraum
+            </div>
+        `;
+        return;
+    }
+    
+    // Lokale Zeit verwenden (nicht UTC/ISO)
+    const dates = times.map(t => new Date(t));
+    
+    const traceTemp = {
+        x: dates,
+        y: temps,
+        mode: 'lines',
+        name: 'Temp (°C)',
+        line: { color: '#ff6b6b', width: 2 },
+        hovertemplate: '%{y:.1f}°C<extra></extra>'
+    };
+    
+    const traceHum = {
+        x: dates,
+        y: hums,
+        yaxis: 'y2',
+        mode: 'lines',
+        name: 'Feuchte (%)',
+        line: { color: '#4dabf7', width: 2 },
+        hovertemplate: '%{y:.1f}%<extra></extra>'
+    };
+    
+    const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+    const bgColor = isDark ? '#2a2a2a' : '#fff';
+    const gridColor = isDark ? '#444' : '#eee';
+    const fontColor = isDark ? '#ccc' : '#666';
+    
+    const layout = {
+        showlegend: false,
+        hovermode: 'x unified',
+        margin: { l: 45, r: 45, t: 10, b: 30 },
+        paper_bgcolor: bgColor,
+        plot_bgcolor: bgColor,
+        xaxis: {
+            type: 'date',
+            gridcolor: gridColor,
+            tickfont: { size: 10, color: fontColor }
+        },
+        yaxis: {
+            title: { text: '°C', font: { size: 10, color: '#ff6b6b' } },
+            titlefont: { color: '#ff6b6b' },
+            tickfont: { size: 10, color: '#ff6b6b' },
+            gridcolor: gridColor
+        },
+        yaxis2: {
+            title: { text: '%', font: { size: 10, color: '#4dabf7' } },
+            titlefont: { color: '#4dabf7' },
+            tickfont: { size: 10, color: '#4dabf7' },
+            overlaying: 'y',
+            side: 'right'
+        }
+    };
+    
+    const config = { 
+        responsive: true, 
+        displayModeBar: false,
+        staticPlot: false
+    };
+    
+    Plotly.newPlot(divId, [traceTemp, traceHum], layout, config);
+}
+
+// Initial laden
+document.addEventListener('DOMContentLoaded', loadSensors);
+
+// Auto-Refresh alle 5 Minuten
+setInterval(loadSensors, 300000);
 </script>
 {% endblock %}

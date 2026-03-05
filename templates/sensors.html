@@ -45,8 +45,13 @@
 <div class="row">
     <div class="col-lg-10">
         <div class="card sensor-card">
-            <div class="card-header bg-light">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="bi bi-table"></i> Konfigurierte Sensoren</h5>
+                {% if sensors %}
+                <button class="btn btn-success btn-sm" onclick="saveOrder()" id="saveOrderBtn">
+                    <i class="bi bi-sort-numeric-down"></i> Reihenfolge speichern
+                </button>
+                {% endif %}
             </div>
             <div class="card-body">
                 {% if sensors %}
@@ -54,14 +59,21 @@
                         <table class="table table-hover mb-0">
                             <thead class="table-light">
                                 <tr>
+                                    <th style="width: 80px;">Pos.</th>
                                     <th>Sensor Name</th>
                                     <th>Device ID</th>
-                                    <th style="width: 150px;">Aktionen</th>
+                                    <th style="width: 180px;">Aktionen</th>
                                 </tr>
                             </thead>
                             <tbody id="sensorsTableBody">
                                 {% for sensor in sensors %}
                                 <tr class="sensor-row" data-device-id="{{ sensor.device_id }}">
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm order-input" 
+                                               value="{{ sensor.sort_order if sensor.sort_order else loop.index }}" 
+                                               min="1" style="width: 60px;" 
+                                               data-device-id="{{ sensor.device_id }}">
+                                    </td>
                                     <td>
                                         <strong>{{ sensor.sensor_name }}</strong>
                                     </td>
@@ -70,10 +82,10 @@
                                     </td>
                                     <td>
                                         <button class="btn btn-sm btn-warning" onclick="editSensor('{{ sensor.device_id }}', '{{ sensor.sensor_name }}')">
-                                            <i class="bi bi-pencil"></i> Bearbeiten
+                                            <i class="bi bi-pencil"></i>
                                         </button>
                                         <button class="btn btn-sm btn-danger" onclick="deleteSensor('{{ sensor.device_id }}', '{{ sensor.sensor_name }}')">
-                                            <i class="bi bi-trash"></i> Löschen
+                                            <i class="bi bi-trash"></i>
                                         </button>
                                     </td>
                                 </tr>
@@ -81,6 +93,9 @@
                             </tbody>
                         </table>
                     </div>
+                    <small class="text-muted mt-2 d-block">
+                        <i class="bi bi-info-circle"></i> Niedrigere Nummer = weiter oben auf dem Dashboard
+                    </small>
                 {% else %}
                     <div class="alert alert-info mb-0">
                         <i class="bi bi-info-circle"></i> <strong>Keine Sensoren vorhanden.</strong>
@@ -214,6 +229,46 @@ function deleteSensor(deviceId, sensorName) {
             .catch(error => {
                 showAlert(`<i class="bi bi-exclamation-circle"></i> Fehler: ${error.message}`, 'danger');
             });
+    }
+}
+
+async function saveOrder() {
+    const orderInputs = document.querySelectorAll('.order-input');
+    const orders = [];
+    
+    orderInputs.forEach(input => {
+        orders.push({
+            device_id: input.dataset.deviceId,
+            sort_order: parseInt(input.value) || 0
+        });
+    });
+    
+    try {
+        const btn = document.getElementById('saveOrderBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Speichern...';
+        
+        const response = await fetch('/api/sensor/order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orders: orders })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showAlert('<i class="bi bi-check-circle"></i> Reihenfolge gespeichert!', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showAlert(`<i class="bi bi-exclamation-circle"></i> Fehler: ${data.error}`, 'danger');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-sort-numeric-down"></i> Reihenfolge speichern';
+        }
+    } catch (error) {
+        showAlert(`<i class="bi bi-exclamation-circle"></i> Fehler: ${error.message}`, 'danger');
+        const btn = document.getElementById('saveOrderBtn');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-sort-numeric-down"></i> Reihenfolge speichern';
     }
 }
 </script>
