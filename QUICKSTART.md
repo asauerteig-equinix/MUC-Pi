@@ -28,15 +28,25 @@ cd /home/pi/smartmeter_project  # alte Installation
 # oder:
 cd /home/pi/MUC-Pi              # neue Installation
 
-cp smartmeter.db smartmeter.db.backup-before-update
-git status
-git pull
-sudo bash setup.sh
-sudo systemctl restart smartmeter
+bash update.sh
 ```
 
-Lokale Daten wie `smartmeter.db`, `smartmeter.log`, `logs/` und `venv/` werden
-nicht geloescht.
+Lokale Daten wie `smartmeter.db`, `smartmeter.log`, `logs/`, `backups/` und
+`venv/` werden nicht geloescht.
+
+Falls noch alte manuelle Code-Aenderungen vorhanden sind und `update.sh` stoppt:
+
+```bash
+bash update.sh --discard-local-code
+```
+
+Falls `update.sh` auf einer alten Installation noch nicht vorhanden ist:
+
+```bash
+git fetch origin
+git checkout origin/main -- update.sh
+bash update.sh --discard-local-code
+```
 
 ### After Setup
 

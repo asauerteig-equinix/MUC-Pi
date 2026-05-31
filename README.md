@@ -51,26 +51,33 @@ Das Skript wird:
 
 ### Bestehende Installation aktualisieren
 
-Vor dem ersten Update pro Raspberry Pi sicherheitshalber die lokale Datenbank sichern:
+Einfacher Standardweg:
 
 ```bash
 cd /home/pi/smartmeter_project  # alte Installation
 # oder:
 cd /home/pi/MUC-Pi              # neue Installation
 
-cp smartmeter.db smartmeter.db.backup-before-update
-git status
+bash update.sh
 ```
 
-Danach das Update einspielen:
+`update.sh` sichert zuerst die lokale Datenbank nach `backups/`, holt den aktuellen Git-Stand, fuehrt `setup.sh` aus und startet den Service neu. Bestehende lokale Daten wie `smartmeter.db`, `smartmeter.log`, `logs/`, `backups/` und `venv/` werden nicht geloescht und sind per `.gitignore` von Git ausgenommen.
+
+Falls auf einem Raspberry Pi noch alte manuelle Code-Aenderungen existieren, stoppt `update.sh` mit einer klaren Meldung und legt vorher einen Patch in `backups/` ab. Wenn diese lokalen Aenderungen nur alte Pfad-Fixes waren und verworfen werden sollen:
 
 ```bash
-git pull
-sudo bash setup.sh
-sudo systemctl restart smartmeter
+bash update.sh --discard-local-code
 ```
 
-`setup.sh` erkennt den aktuellen Projektordner automatisch. Bestehende lokale Daten wie `smartmeter.db`, `smartmeter.log`, `logs/` und `venv/` werden nicht geloescht und sind per `.gitignore` von Git ausgenommen.
+Auch dabei bleibt die Datenbank erhalten; nur lokale Aenderungen an versionierten Code-Dateien werden nach vorheriger Patch-Sicherung auf den GitHub-Stand zurueckgesetzt.
+
+Falls `update.sh` auf einer alten Installation noch nicht vorhanden ist:
+
+```bash
+git fetch origin
+git checkout origin/main -- update.sh
+bash update.sh --discard-local-code
+```
 
 ### 3. Manuelles Setup
 

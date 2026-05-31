@@ -248,32 +248,38 @@ log_info ""
 log_info "Netzwerk-Bridge Konfiguration"
 log_info "================================"
 echo ""
-echo "Dieses Skript unterstuetzt automatisch:"
-echo "  - NetworkManager (moderne Raspberry Pi OS Bookworm)"
-echo "  - dhcpcd (aeltere Varianten)"
-echo ""
-read -p "Soll die Netzwerk-Bridge (WiFi <-> LAN zum MUC) konfiguriert werden? (j/n): " -n 1 -r
-echo ""
-if [[ $REPLY =~ ^[Jj]$ ]]; then
-    log_info "Starte Netzwerk-Bridge Setup (Auto-Detection aktiv)..."
-    chmod +x "$PROJECT_DIR/network_setup.sh"
-    bash "$PROJECT_DIR/network_setup.sh"
-
-    echo ""
-    log_warn "Reboot erforderlich fuer Netzwerk-Aenderungen!"
-    echo ""
-    read -p "Jetzt neustarten? (j/n): " -n 1 -r
-    echo ""
-    if [[ $REPLY =~ ^[Jj]$ ]]; then
-        log_info "System wird neu gestartet..."
-        sleep 2
-        reboot
-    else
-        log_warn "Bitte spaeter manuell neustarten: sudo reboot"
-    fi
-else
-    log_info "Netzwerk-Bridge Setup uebersprungen"
+if [ "${SKIP_NETWORK_SETUP:-0}" = "1" ]; then
+    log_info "Netzwerk-Bridge Setup im Update-Modus uebersprungen"
     log_info "Kann spaeter manuell ausgefuehrt werden: sudo bash $PROJECT_DIR/network_setup.sh"
+else
+    echo "Dieses Skript unterstuetzt automatisch:"
+    echo "  - NetworkManager (moderne Raspberry Pi OS Bookworm)"
+    echo "  - dhcpcd (aeltere Varianten)"
+    echo ""
+    read -p "Soll die Netzwerk-Bridge (WiFi <-> LAN zum MUC) konfiguriert werden? (j/n): " -n 1 -r
+    echo ""
+
+    if [[ $REPLY =~ ^[Jj]$ ]]; then
+        log_info "Starte Netzwerk-Bridge Setup (Auto-Detection aktiv)..."
+        chmod +x "$PROJECT_DIR/network_setup.sh"
+        bash "$PROJECT_DIR/network_setup.sh"
+
+        echo ""
+        log_warn "Reboot erforderlich fuer Netzwerk-Aenderungen!"
+        echo ""
+        read -p "Jetzt neustarten? (j/n): " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Jj]$ ]]; then
+            log_info "System wird neu gestartet..."
+            sleep 2
+            reboot
+        else
+            log_warn "Bitte spaeter manuell neustarten: sudo reboot"
+        fi
+    else
+        log_info "Netzwerk-Bridge Setup uebersprungen"
+        log_info "Kann spaeter manuell ausgefuehrt werden: sudo bash $PROJECT_DIR/network_setup.sh"
+    fi
 fi
 
 # 13. Startmoeglichkeiten

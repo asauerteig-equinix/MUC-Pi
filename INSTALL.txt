@@ -96,22 +96,23 @@
 
 Update bestehender Installationen:
    $ cd /home/pi/smartmeter_project   # alte Installation
-   $ cp smartmeter.db smartmeter.db.backup-before-update
-   $ git status
-   $ git pull
-   $ sudo bash setup.sh
-   $ sudo systemctl restart smartmeter
+   $ bash update.sh
 
    Oder bei neuer Installation:
    $ cd /home/pi/MUC-Pi
-   $ cp smartmeter.db smartmeter.db.backup-before-update
-   $ git status
-   $ git pull
-   $ sudo bash setup.sh
-   $ sudo systemctl restart smartmeter
+   $ bash update.sh
 
-   setup.sh erkennt den aktuellen Projektordner automatisch.
-   smartmeter.db, smartmeter.log, logs/ und venv/ werden nicht geloescht.
+   update.sh sichert smartmeter.db nach backups/, aktualisiert Git,
+   fuehrt setup.sh aus und startet den Service neu.
+   smartmeter.db, smartmeter.log, logs/, backups/ und venv/ werden nicht geloescht.
+
+   Falls noch alte manuelle Code-Aenderungen vorhanden sind:
+   $ bash update.sh --discard-local-code
+
+   Falls update.sh auf einer alten Installation noch nicht vorhanden ist:
+   $ git fetch origin
+   $ git checkout origin/main -- update.sh
+   $ bash update.sh --discard-local-code
 
 3. Service starten:
    $ sudo systemctl start smartmeter
