@@ -36,9 +36,11 @@ env/
 # Database
 *.db
 *.sqlite3
+smartmeter.db
 
 # Logs
 *.log
+smartmeter.log
 logs/
 
 # Local files

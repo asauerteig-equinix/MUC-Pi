@@ -176,7 +176,7 @@ def api_dashboard_chart(device_id, timerange):
             "30d": 2592000
         }
         
-        seconds = timeranges.get(timerange, 3600)
+        seconds = timeranges.get(timerange, 86400)
         measurements = get_measurements(device_id, seconds)
         
         times, temps, hums = process_measurements(measurements)

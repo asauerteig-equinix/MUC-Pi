@@ -5,8 +5,8 @@ After=network.target
 [Service]
 Type=simple
 User=pi
-WorkingDirectory=/home/pi/smartmeter_project
-ExecStart=/home/pi/smartmeter_project/venv/bin/python /home/pi/smartmeter_project/app.py
+WorkingDirectory=/home/pi/MUC-Pi
+ExecStart=/home/pi/MUC-Pi/venv/bin/python /home/pi/MUC-Pi/app.py
 Restart=always
 RestartSec=10
 StandardOutput=journal

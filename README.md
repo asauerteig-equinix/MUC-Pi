@@ -30,8 +30,8 @@ Ein modernes Temperatur- und Luftfeuchtigkeits-Monitoring-System für den Raspbe
 
 ```bash
 cd /home/pi
-git clone https://github.com/yourusername/smartmeter-project.git
-cd smartmeter_project
+git clone https://github.com/asauerteig-equinix/MUC-Pi.git
+cd MUC-Pi
 ```
 
 ### 2. Automatisches Setup (Empfohlen)
@@ -47,6 +47,30 @@ Das Skript wird:
 - Datenbank initialisieren
 - Cronjob einrichten
 - Systemd Service konfigurieren
+- systemd/nginx/cron auf den aktuellen Projektordner konfigurieren
+
+### Bestehende Installation aktualisieren
+
+Vor dem ersten Update pro Raspberry Pi sicherheitshalber die lokale Datenbank sichern:
+
+```bash
+cd /home/pi/smartmeter_project  # alte Installation
+# oder:
+cd /home/pi/MUC-Pi              # neue Installation
+
+cp smartmeter.db smartmeter.db.backup-before-update
+git status
+```
+
+Danach das Update einspielen:
+
+```bash
+git pull
+sudo bash setup.sh
+sudo systemctl restart smartmeter
+```
+
+`setup.sh` erkennt den aktuellen Projektordner automatisch. Bestehende lokale Daten wie `smartmeter.db`, `smartmeter.log`, `logs/` und `venv/` werden nicht geloescht und sind per `.gitignore` von Git ausgenommen.
 
 ### 3. Manuelles Setup
 
@@ -150,7 +174,7 @@ sudo systemctl enable smartmeter
 sudo journalctl -u smartmeter -f
 
 # Anwendungs-Logs
-tail -f /home/pi/smartmeter_project/smartmeter.log
+tail -f smartmeter.log
 ```
 
 ### Manueller Datenimport
@@ -158,7 +182,7 @@ tail -f /home/pi/smartmeter_project/smartmeter.log
 Zur initialen Befüllung der Datenbank mit historischen Daten:
 
 ```bash
-sudo /home/pi/smartmeter_project/manual_import.sh
+sudo ./manual_import.sh
 ```
 
 Dieses Skript lädt **alle** historischen Logdateien vom MUC herunter.
@@ -197,9 +221,9 @@ smartmeter_project/
 
 ### "Datenbankfehler"
 ```bash
-# Datenbank neu initialisieren
-rm /home/pi/smartmeter_project/smartmeter.db
-python3 /home/pi/smartmeter_project/app.py
+# Datenbank zuerst sichern, dann App starten und Logs pruefen
+cp smartmeter.db smartmeter.db.backup
+python3 app.py
 ```
 
 ### "FTP-Verbindungsfehler"

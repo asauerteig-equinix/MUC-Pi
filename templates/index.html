@@ -206,8 +206,8 @@
 
             <!-- Chart Tabs -->
             <div class="chart-tabs">
-                <button class="chart-tab-btn active" data-range="1h">1h</button>
-                <button class="chart-tab-btn" data-range="1d">24h</button>
+                <button class="chart-tab-btn" data-range="1h">1h</button>
+                <button class="chart-tab-btn active" data-range="1d">24h</button>
                 <button class="chart-tab-btn" data-range="7d">7T</button>
                 <button class="chart-tab-btn" data-range="30d">30T</button>
             </div>
@@ -230,6 +230,7 @@
 // Globale Sensor-Daten
 let sensorsData = [];
 let chartCache = {};
+const DEFAULT_CHART_RANGE = '1d';
 
 // Farbklasse für Temperatur bestimmen
 function getTempClass(temp) {
@@ -338,8 +339,8 @@ function renderSensors() {
         
         container.appendChild(card);
         
-        // Initialen Chart laden (1h)
-        loadChart(sensor.device_id, '1h', `chart-${index}`);
+        // Initialen Chart laden
+        loadChart(sensor.device_id, DEFAULT_CHART_RANGE, `chart-${index}`);
     });
 }
 
@@ -374,7 +375,7 @@ async function loadChart(deviceId, timerange, chartId) {
             chartCache[cacheKey] = { data: chartData, timestamp: Date.now() };
         }
         
-        renderChart(chartId, chartData.times, chartData.temps, chartData.hums, timerange);
+        await renderChart(chartId, chartData.times, chartData.temps, chartData.hums, timerange);
         
     } catch (error) {
         console.error('Chart-Fehler:', error);
@@ -383,16 +384,25 @@ async function loadChart(deviceId, timerange, chartId) {
 }
 
 // Chart rendern
-function renderChart(divId, times, temps, hums, timerange) {
+async function renderChart(divId, times, temps, hums, timerange) {
+    const chartDiv = document.getElementById(divId);
+    if (!chartDiv) {
+        return;
+    }
+
+    Plotly.purge(chartDiv);
+
     if (times.length === 0) {
-        document.getElementById(divId).innerHTML = `
+        chartDiv.innerHTML = `
             <div class="text-muted text-center py-5">
                 <i class="bi bi-graph-down"></i> Keine Daten für diesen Zeitraum
             </div>
         `;
         return;
     }
-    
+
+    chartDiv.innerHTML = '';
+
     // Lokale Zeit verwenden (nicht UTC/ISO)
     const dates = times.map(t => new Date(t));
     
@@ -452,7 +462,7 @@ function renderChart(divId, times, temps, hums, timerange) {
         staticPlot: false
     };
     
-    Plotly.newPlot(divId, [traceTemp, traceHum], layout, config);
+    await Plotly.newPlot(chartDiv, [traceTemp, traceHum], layout, config);
 }
 
 // Initial laden

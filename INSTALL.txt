@@ -74,8 +74,8 @@
 
 1. Git-Repository klonen:
    $ cd /home/pi
-   $ git clone <dein-repo> smartmeter_project
-   $ cd smartmeter_project
+   $ git clone https://github.com/asauerteig-equinix/MUC-Pi.git
+   $ cd MUC-Pi
 
 2. Setup ausführen (automatisch):
    $ sudo bash setup.sh
@@ -93,6 +93,25 @@
    ✓ nginx Reverse Proxy (Port 80)
    ✓ Systemd Service installieren
    ✓ (Optional) Netzwerk-Bridge zum MUC
+
+Update bestehender Installationen:
+   $ cd /home/pi/smartmeter_project   # alte Installation
+   $ cp smartmeter.db smartmeter.db.backup-before-update
+   $ git status
+   $ git pull
+   $ sudo bash setup.sh
+   $ sudo systemctl restart smartmeter
+
+   Oder bei neuer Installation:
+   $ cd /home/pi/MUC-Pi
+   $ cp smartmeter.db smartmeter.db.backup-before-update
+   $ git status
+   $ git pull
+   $ sudo bash setup.sh
+   $ sudo systemctl restart smartmeter
+
+   setup.sh erkennt den aktuellen Projektordner automatisch.
+   smartmeter.db, smartmeter.log, logs/ und venv/ werden nicht geloescht.
 
 3. Service starten:
    $ sudo systemctl start smartmeter
@@ -155,8 +174,8 @@ Parameter anpassbar in cronjob_fetch.py!
 💻 ENTWICKLUNG LOKAL
 ═════════════════════════════════════════════
 
-$ git clone <dein-repo>
-$ cd smartmeter_project
+$ git clone https://github.com/asauerteig-equinix/MUC-Pi.git
+$ cd MUC-Pi
 $ python3 -m venv venv
 $ source venv/bin/activate
 $ pip install -r requirements.txt
@@ -193,7 +212,7 @@ $ sudo systemctl status smartmeter    # Status
 
 Logs anschauen:
 $ sudo journalctl -u smartmeter -f
-$ tail -f /home/pi/smartmeter_project/smartmeter.log
+$ tail -f smartmeter.log
 
 ═════════════════════════════════════════════
 🌍 NETZWERK
