@@ -21,6 +21,9 @@ from config import DATABASE_FILE, LOG_FILE
 # Konfiguration
 ARCHIVE_DAYS_THRESHOLD = 35  # Daten älter als 35 Tage archivieren (5 Tage Puffer über 30-Tage-Anzeige)
 ARCHIVE_DIR = os.path.join(os.path.dirname(__file__), "archiv")
+DB_TIMEOUT = 60  # Sekunden warten wenn DB gelockt ist
+MAX_RETRIES = 3  # Anzahl Wiederholungsversuche bei Lock
+RETRY_DELAY = 30  # Sekunden zwischen Versuchen
 
 # Logging
 logging.basicConfig(
@@ -78,6 +81,9 @@ def run_cleanup():
     2. Kopiere alte Messungen in Archiv-DB
     3. Lösche archivierte Messungen aus Haupt-DB
     4. VACUUM um Speicherplatz freizugeben
+    
+    Verwendet Busy-Timeout und Retry-Logik um Database-Locks
+    durch die laufende Flask-App zu vermeiden.
     """
     cutoff_timestamp = int(time.time()) - (ARCHIVE_DAYS_THRESHOLD * 86400)
     cutoff_date = datetime.fromtimestamp(cutoff_timestamp).strftime('%d.%m.%Y %H:%M')
@@ -89,8 +95,10 @@ def run_cleanup():
         logger.info("Keine Datenbank vorhanden, nichts zu tun.")
         return
     
-    main_conn = sqlite3.connect(DATABASE_FILE)
+    main_conn = sqlite3.connect(DATABASE_FILE, timeout=DB_TIMEOUT)
     main_conn.row_factory = sqlite3.Row
+    # WAL-Modus erlaubt gleichzeitiges Lesen+Schreiben
+    main_conn.execute("PRAGMA journal_mode=WAL")
     
     # Zähle zu archivierende Einträge
     count = main_conn.execute(
@@ -131,27 +139,43 @@ def run_cleanup():
         )
         archive_conn.commit()
         
-        # Aus Hauptdatenbank löschen (die gleichen IDs)
-        ids = [r["device_id"] for r in rows]
+        # Aus Hauptdatenbank löschen mit Retry bei Lock
         timestamps = [r["timestamp"] for r in rows]
-        
-        # Batch-Delete über Timestamp-Range dieses Batches
         min_ts = min(timestamps)
         max_ts = max(timestamps)
-        main_conn.execute(
-            "DELETE FROM measurements WHERE timestamp >= ? AND timestamp <= ? AND timestamp < ?",
-            (min_ts, max_ts, cutoff_timestamp)
-        )
-        main_conn.commit()
+        
+        for attempt in range(MAX_RETRIES):
+            try:
+                main_conn.execute(
+                    "DELETE FROM measurements WHERE timestamp >= ? AND timestamp <= ? AND timestamp < ?",
+                    (min_ts, max_ts, cutoff_timestamp)
+                )
+                main_conn.commit()
+                break
+            except sqlite3.OperationalError as e:
+                if "locked" in str(e).lower() and attempt < MAX_RETRIES - 1:
+                    logger.warning(f"  DB gelockt, warte {RETRY_DELAY}s (Versuch {attempt + 1}/{MAX_RETRIES})...")
+                    time.sleep(RETRY_DELAY)
+                else:
+                    raise
         
         total_archived += len(rows)
         logger.info(f"  Fortschritt: {total_archived}/{count} archiviert...")
     
     archive_conn.close()
     
-    # VACUUM um Speicherplatz freizugeben
+    # VACUUM um Speicherplatz freizugeben (mit Retry bei Lock)
     logger.info("Führe VACUUM aus (Speicherplatz freigeben)...")
-    main_conn.execute("VACUUM")
+    for attempt in range(MAX_RETRIES):
+        try:
+            main_conn.execute("VACUUM")
+            break
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e).lower() and attempt < MAX_RETRIES - 1:
+                logger.warning(f"  VACUUM: DB gelockt, warte {RETRY_DELAY}s (Versuch {attempt + 1}/{MAX_RETRIES})...")
+                time.sleep(RETRY_DELAY)
+            else:
+                logger.warning(f"  VACUUM übersprungen: {e} (Wird beim nächsten Lauf nachgeholt)")
     main_conn.close()
     
     # Dateigrößen loggen

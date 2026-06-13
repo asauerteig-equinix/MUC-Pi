@@ -21,8 +21,10 @@ def get_db_connection():
             logger.info(f"Datenbank existiert nicht, erstelle sie: {DATABASE_FILE}")
             _create_database()
         
-        conn = sqlite3.connect(DATABASE_FILE)
+        conn = sqlite3.connect(DATABASE_FILE, timeout=30)
         conn.row_factory = sqlite3.Row
+        # WAL-Modus: Erlaubt gleichzeitiges Lesen und Schreiben
+        conn.execute("PRAGMA journal_mode=WAL")
         # Test: Können wir auf die Tabelle zugreifen?
         conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
         return conn
