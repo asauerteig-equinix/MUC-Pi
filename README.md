@@ -142,6 +142,20 @@ Nachdem der Service gestartet ist:
 
 Der Cronjob läuft **jede Minute** und entscheidet anhand der Uhrzeit, ob ein Abruf erfolgt.
 
+### 🗄️ Datenbank-Archivierung
+
+Täglich um **03:00 Uhr** werden Messdaten älter als 35 Tage automatisch archiviert:
+
+- Alte Daten werden in `archiv/archiv_YYYY.db` verschoben (nach Jahr getrennt)
+- Die Hauptdatenbank (`smartmeter.db`) bleibt schlank (~30 Tage Daten)
+- Nach dem Archivieren wird `VACUUM` ausgeführt um Speicherplatz freizugeben
+- **Keine Daten gehen verloren** – alles bleibt im Archiv erhalten
+
+Manuell ausführen:
+```bash
+python3 db_cleanup.py
+```
+
 ---
 
 ## 📱 Bedienung
@@ -220,6 +234,7 @@ smartmeter_project/
 ├── app.py                    # Flask Hauptanwendung
 ├── config.py                 # Konfiguration
 ├── db.py                     # Datenbank-Modul
+├── db_cleanup.py             # Archivierung & Bereinigung
 ├── ftp_handler.py            # FTP und CSV-Import
 ├── cronjob_fetch.py          # Abruf-Logik
 ├── cronjob_wrapper.sh        # Cronjob-Wrapper
@@ -237,6 +252,7 @@ smartmeter_project/
 │   ├── sensors.html         # Sensor-Verwaltung
 │   └── error.html           # Error Page
 ├── logs/                     # Temporäre CSV-Dateien
+├── archiv/                   # Archivierte Messdaten (pro Jahr)
 └── smartmeter.db            # SQLite Datenbank
 ```
 

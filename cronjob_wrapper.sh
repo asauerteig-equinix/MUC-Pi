@@ -10,5 +10,12 @@ if [ -f "venv/bin/activate" ]; then
     source venv/bin/activate
 fi
 
-# Python-Skript ausführen
+# Python-Skript ausführen (Daten abrufen)
 /usr/bin/python3 "$PROJECT_DIR/cronjob_fetch.py"
+
+# Einmal täglich um 03:00 Uhr: Datenbank archivieren/bereinigen
+HOUR=$(date +%H)
+MINUTE=$(date +%M)
+if [ "$HOUR" = "03" ] && [ "$MINUTE" = "00" ]; then
+    /usr/bin/python3 "$PROJECT_DIR/db_cleanup.py"
+fi

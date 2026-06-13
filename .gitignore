@@ -43,6 +43,7 @@ smartmeter.db
 smartmeter.log
 logs/
 backups/
+archiv/
 
 # Local files
 .env
