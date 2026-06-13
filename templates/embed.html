@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="de" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smartmeter Embed</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: transparent;
+            padding: 0.5rem;
+            overflow-x: hidden;
+        }
+
+        /* HA Theme Detection */
+        @media (prefers-color-scheme: dark) {
+            :root { --bg: #1c1c1c; --card-bg: #2a2a2a; --text: #e0e0e0; --muted: #888; --border: #444; }
+            html { data-bs-theme: dark; }
+            body { color: var(--text); }
+        }
+        @media (prefers-color-scheme: light) {
+            :root { --bg: transparent; --card-bg: #fff; --text: #333; --muted: #666; --border: #e0e0e0; }
+            body { color: var(--text); }
+        }
+
+        :root {
+            --bg: transparent;
+            --card-bg: #fff;
+            --text: #333;
+            --muted: #666;
+            --border: #e0e0e0;
+        }
+
+        [data-bs-theme="dark"] {
+            --bg: #1c1c1c;
+            --card-bg: #2a2a2a;
+            --text: #e0e0e0;
+            --muted: #888;
+            --border: #444;
+        }
+
+        body { color: var(--text); }
+
+        .sensor-tile {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .sensor-tile:hover {
+            border-color: #0d6efd;
+            box-shadow: 0 2px 8px rgba(13, 110, 253, 0.15);
+        }
+
+        .sensor-tile.expanded {
+            border-color: #0d6efd;
+        }
+
+        .tile-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .tile-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .tile-values {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .tile-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        .tile-value.temp { color: #ff6b6b; }
+        .tile-value.hum { color: #4dabf7; }
+
+        .tile-value.optimal { color: #198754; }
+        .tile-value.too-cold { color: #0d6efd; }
+        .tile-value.too-warm { color: #dc3545; }
+        .tile-value.too-dry { color: #ffc107; }
+        .tile-value.too-humid { color: #0d6efd; }
+
+        .tile-time {
+            font-size: 0.7rem;
+            color: var(--muted);
+            margin-top: 0.25rem;
+        }
+
+        .tile-expand-icon {
+            font-size: 0.8rem;
+            color: var(--muted);
+            transition: transform 0.2s ease;
+        }
+
+        .sensor-tile.expanded .tile-expand-icon {
+            transform: rotate(180deg);
+        }
+
+        /* Chart Panel */
+        .chart-panel {
+            display: none;
+            padding: 0.75rem 0 0 0;
+            animation: slideDown 0.2s ease;
+        }
+
+        .sensor-tile.expanded .chart-panel {
+            display: block;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; max-height: 0; }
+            to { opacity: 1; max-height: 400px; }
+        }
+
+        .chart-tabs {
+            display: flex;
+            gap: 0.25rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .chart-tab-btn {
+            flex: 1;
+            padding: 0.3rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            background: var(--card-bg);
+            color: var(--text);
+            transition: all 0.2s ease;
+        }
+
+        .chart-tab-btn:hover {
+            border-color: #0d6efd;
+        }
+
+        .chart-tab-btn.active {
+            background: #0d6efd;
+            color: white;
+            border-color: #0d6efd;
+        }
+
+        .chart-area {
+            height: 200px;
+            width: 100%;
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 60px;
+            color: var(--muted);
+        }
+
+        .no-sensors {
+            text-align: center;
+            padding: 2rem;
+            color: var(--muted);
+        }
+
+        /* HA-spezifisch: Transparenter Hintergrund */
+        :root {
+            --ha-card-background: var(--card-bg);
+        }
+    </style>
+</head>
+<body>
+    <div id="sensors-container">
+        <div class="loading">
+            <i class="bi bi-arrow-repeat spin"></i>&nbsp; Laden...
+        </div>
+    </div>
+
+    <script>
+    // Theme aus URL-Parameter oder System erkennen
+    (function() {
+        const params = new URLSearchParams(window.location.search);
+        const theme = params.get('theme');
+        if (theme === 'dark') {
+            document.documentElement.setAttribute('data-bs-theme', 'dark');
+        } else if (theme === 'light') {
+            document.documentElement.setAttribute('data-bs-theme', 'light');
+        } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.setAttribute('data-bs-theme', 'dark');
+        }
+    })();
+
+    let chartCache = {};
+
+    function getTempClass(temp) {
+        if (temp === null || temp === undefined) return 'temp';
+        if (temp < 18) return 'too-cold';
+        if (temp > 26) return 'too-warm';
+        return 'optimal';
+    }
+
+    function getHumClass(hum) {
+        if (hum === null || hum === undefined) return 'hum';
+        if (hum < 30) return 'too-dry';
+        if (hum > 70) return 'too-humid';
+        return 'optimal';
+    }
+
+    async function loadSensors() {
+        const container = document.getElementById('sensors-container');
+        
+        try {
+            const response = await fetch('/api/dashboard/sensors');
+            const data = await response.json();
+            
+            if (!data.success) throw new Error(data.error);
+            
+            if (data.sensors.length === 0) {
+                container.innerHTML = '<div class="no-sensors"><i class="bi bi-exclamation-circle"></i> Keine Sensoren</div>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            data.sensors.forEach((sensor, idx) => {
+                const tile = createTile(sensor, idx);
+                container.appendChild(tile);
+            });
+            
+        } catch (err) {
+            container.innerHTML = `<div class="no-sensors"><i class="bi bi-exclamation-triangle"></i> Fehler: ${err.message}</div>`;
+        }
+    }
+
+    function createTile(sensor, idx) {
+        const tile = document.createElement('div');
+        tile.className = 'sensor-tile';
+        tile.dataset.deviceId = sensor.device_id;
+        
+        const tempClass = getTempClass(sensor.latest_temp);
+        const humClass = getHumClass(sensor.latest_hum);
+        const tempVal = sensor.latest_temp !== null ? `${sensor.latest_temp}°C` : '--';
+        const humVal = sensor.latest_hum !== null ? `${sensor.latest_hum}%` : '--';
+        
+        tile.innerHTML = `
+            <div class="tile-header" onclick="toggleChart(this.parentElement)">
+                <div>
+                    <div class="tile-name">${sensor.sensor_name}</div>
+                    <div class="tile-time"><i class="bi bi-clock"></i> ${sensor.latest_time}</div>
+                </div>
+                <div class="tile-values">
+                    <span class="tile-value ${tempClass}"><i class="bi bi-thermometer"></i> ${tempVal}</span>
+                    <span class="tile-value ${humClass}"><i class="bi bi-droplet"></i> ${humVal}</span>
+                    <i class="bi bi-chevron-down tile-expand-icon"></i>
+                </div>
+            </div>
+            <div class="chart-panel">
+                <div class="chart-tabs">
+                    <button class="chart-tab-btn" data-range="1h" onclick="event.stopPropagation(); switchRange(this, '${sensor.device_id}', ${idx})">1h</button>
+                    <button class="chart-tab-btn active" data-range="1d" onclick="event.stopPropagation(); switchRange(this, '${sensor.device_id}', ${idx})">24h</button>
+                    <button class="chart-tab-btn" data-range="7d" onclick="event.stopPropagation(); switchRange(this, '${sensor.device_id}', ${idx})">7T</button>
+                    <button class="chart-tab-btn" data-range="30d" onclick="event.stopPropagation(); switchRange(this, '${sensor.device_id}', ${idx})">30T</button>
+                </div>
+                <div class="chart-area" id="chart-${idx}"></div>
+            </div>
+        `;
+        
+        return tile;
+    }
+
+    function toggleChart(tile) {
+        const wasExpanded = tile.classList.contains('expanded');
+        
+        // Alle schließen
+        document.querySelectorAll('.sensor-tile.expanded').forEach(t => {
+            t.classList.remove('expanded');
+        });
+        
+        // Dieses öffnen (wenn es nicht schon offen war)
+        if (!wasExpanded) {
+            tile.classList.add('expanded');
+            const idx = [...document.querySelectorAll('.sensor-tile')].indexOf(tile);
+            const deviceId = tile.dataset.deviceId;
+            loadChart(deviceId, '1d', idx);
+        }
+    }
+
+    function switchRange(btn, deviceId, idx) {
+        const tabs = btn.parentElement.querySelectorAll('.chart-tab-btn');
+        tabs.forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+        loadChart(deviceId, btn.dataset.range, idx);
+    }
+
+    async function loadChart(deviceId, timerange, idx) {
+        const chartDiv = document.getElementById(`chart-${idx}`);
+        const cacheKey = `${deviceId}-${timerange}`;
+
+        chartDiv.innerHTML = '<div class="loading"><i class="bi bi-arrow-repeat"></i>&nbsp; Laden...</div>';
+
+        try {
+            const cached = chartCache[cacheKey];
+            let chartData;
+            
+            if (cached && (Date.now() - cached.timestamp < 300000)) {
+                chartData = cached.data;
+            } else {
+                const response = await fetch(`/api/dashboard/chart/${deviceId}/${timerange}`);
+                const data = await response.json();
+                if (!data.success) throw new Error(data.error);
+                chartData = data;
+                chartCache[cacheKey] = { data: chartData, timestamp: Date.now() };
+            }
+
+            renderChart(chartDiv, chartData.times, chartData.temps, chartData.hums);
+        } catch (err) {
+            chartDiv.innerHTML = `<div class="loading">Keine Daten</div>`;
+        }
+    }
+
+    function renderChart(chartDiv, times, temps, hums) {
+        if (times.length === 0) {
+            chartDiv.innerHTML = '<div class="loading">Keine Daten für diesen Zeitraum</div>';
+            return;
+        }
+
+        chartDiv.innerHTML = '';
+        const dates = times.map(t => new Date(t));
+        const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+        const bgColor = isDark ? '#2a2a2a' : '#fff';
+        const gridColor = isDark ? '#444' : '#eee';
+        const fontColor = isDark ? '#ccc' : '#666';
+
+        const traceTemp = {
+            x: dates, y: temps,
+            mode: 'lines', name: 'Temp',
+            line: { color: '#ff6b6b', width: 2 },
+            hovertemplate: '%{y:.1f}°C<extra></extra>'
+        };
+
+        const traceHum = {
+            x: dates, y: hums, yaxis: 'y2',
+            mode: 'lines', name: 'Feuchte',
+            line: { color: '#4dabf7', width: 2 },
+            hovertemplate: '%{y:.1f}%<extra></extra>'
+        };
+
+        const layout = {
+            showlegend: false,
+            hovermode: 'x unified',
+            margin: { l: 35, r: 35, t: 5, b: 25 },
+            paper_bgcolor: bgColor,
+            plot_bgcolor: bgColor,
+            xaxis: {
+                type: 'date',
+                gridcolor: gridColor,
+                tickfont: { size: 9, color: fontColor }
+            },
+            yaxis: {
+                title: { text: '°C', font: { size: 9, color: '#ff6b6b' } },
+                tickfont: { size: 9, color: '#ff6b6b' },
+                gridcolor: gridColor
+            },
+            yaxis2: {
+                title: { text: '%', font: { size: 9, color: '#4dabf7' } },
+                tickfont: { size: 9, color: '#4dabf7' },
+                overlaying: 'y',
+                side: 'right'
+            }
+        };
+
+        Plotly.newPlot(chartDiv, [traceTemp, traceHum], layout, {
+            responsive: true,
+            displayModeBar: false
+        });
+    }
+
+    // Initial laden
+    document.addEventListener('DOMContentLoaded', loadSensors);
+
+    // Auto-Refresh alle 5 Minuten (nur Werte, nicht offene Charts)
+    setInterval(loadSensors, 300000);
+    </script>
+</body>
+</html>

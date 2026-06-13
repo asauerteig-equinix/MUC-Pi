@@ -68,6 +68,11 @@ def index():
         logger.error(f"Fehler im Dashboard: {e}")
         return render_template("error.html", error=str(e)), 500
 
+@app.route("/embed")
+def embed_dashboard():
+    """Einbettbares Dashboard für Home Assistant (iframe-optimiert)."""
+    return render_template("embed.html")
+
 @app.route("/sensors")
 def sensors_page():
     """Sensoren-Verwaltungsseite."""

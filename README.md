@@ -13,6 +13,7 @@ Ein modernes Temperatur- und Luftfeuchtigkeits-Monitoring-System für den Raspbe
 ✅ **FTP-Integration** - Automatischer Abruf vom MUC-Smartmeter  
 ✅ **Fehlertoleranz** - Funktioniert auch wenn Datenbank beschädigt ist  
 ✅ **Systemd Service** - Automatischer Start beim Boot  
+✅ **Home Assistant Embed** - Einbettbares Dashboard für HA iframes  
 
 ---
 
@@ -126,6 +127,7 @@ Nachdem der Service gestartet ist:
 
 - **Web-Interface Dashboard:** `http://muc` (Port 80 über nginx)
 - **Sensor-Verwaltung:** `http://muc/sensors`
+- **Embed für Home Assistant:** `http://muc/embed` (iframe-optimiert, ohne Navigation)
 - **MUC Smartmeter:** `http://muc:8080` (Portweiterleitung von außen) oder `http://192.168.100.101` (direkt im LAN)
 - **API Status:** `http://muc/api/status`
 
@@ -148,6 +150,21 @@ Der Cronjob läuft **jede Minute** und entscheidet anhand der Uhrzeit, ob ein Ab
 - Zeigt aktuelle Messwerte aller Sensoren
 - Interactive Diagramme (1h, 1d, 7d, 30d)
 - Automatisches Refresh der Daten
+
+### Home Assistant Integration
+
+Das Embed-Dashboard unter `/embed` ist speziell für die Einbettung in Home Assistant optimiert:
+
+```yaml
+# Lovelace Card (YAML)
+type: iframe
+url: "http://muc/embed?theme=dark"
+aspect_ratio: "4:3"
+```
+
+- **Theme-Parameter:** `?theme=dark` oder `?theme=light` (sonst automatisch via `prefers-color-scheme`)
+- **Kein Scrollen nötig:** Kompakte Kacheln mit aufklappbarem Chart per Tap
+- **Mobil-optimiert:** Funktioniert gut auf Handy-Displays in der HA-App
 
 ### Sensoren verwalten
 - **Hinzufügen:** Device ID + Name eingeben
@@ -216,6 +233,7 @@ smartmeter_project/
 ├── templates/
 │   ├── base.html            # Base Template
 │   ├── index.html           # Dashboard
+│   ├── embed.html           # Einbettbares Dashboard (HA)
 │   ├── sensors.html         # Sensor-Verwaltung
 │   └── error.html           # Error Page
 ├── logs/                     # Temporäre CSV-Dateien
@@ -258,6 +276,7 @@ sudo journalctl -u smartmeter -n 50
 | Method | Endpoint | Beschreibung |
 |--------|----------|-------------|
 | GET | `/` | Dashboard |
+| GET | `/embed` | Einbettbares Dashboard (Home Assistant) |
 | GET | `/sensors` | Sensoren-Verwaltung |
 | POST | `/api/sensor/add` | Sensor hinzufügen |
 | POST | `/api/sensor/update` | Sensor aktualisieren |
